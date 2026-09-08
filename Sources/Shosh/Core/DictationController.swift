@@ -304,7 +304,11 @@ final class DictationController {
                 Log.speech.info("dictionary · \(corrections.count, privacy: .public) correction(s) applied")
             }
 
-            recordRun(text: output, corrections: corrections)
+            // Captured right before injection, not at hold-start: the HUD is a
+            // non-activating panel, so whatever app is frontmost *now* is the one that's
+            // about to receive the text — the one the dashboard should credit.
+            let target = NSWorkspace.shared.frontmostApplication
+            recordRun(text: output, corrections: corrections, appName: target?.localizedName, appBundleID: target?.bundleIdentifier)
             TextInjector.insert(output)
             if Settings.shared.soundEnabled { NSSound(named: "Pop")?.play() }
 
@@ -433,7 +437,12 @@ final class DictationController {
     /// `processSeconds` is measured from key release, not from capture start — that's the
     /// wait the user actually experiences, and it's the only number on which a streaming
     /// engine and a batch engine can be compared honestly.
-    private func recordRun(text: String, corrections: [AppliedCorrection] = []) {
+    private func recordRun(
+        text: String,
+        corrections: [AppliedCorrection] = [],
+        appName: String? = nil,
+        appBundleID: String? = nil
+    ) {
         guard let holdStarted, let releasedAt else { return }
         RunLog.record(
             DictationRun(
@@ -442,7 +451,9 @@ final class DictationController {
                 audioSeconds: releasedAt.timeIntervalSince(holdStarted),
                 processSeconds: Date().timeIntervalSince(releasedAt),
                 text: text,
-                corrections: corrections.isEmpty ? nil : corrections
+                corrections: corrections.isEmpty ? nil : corrections,
+                appName: appName,
+                appBundleID: appBundleID
             )
         )
         self.holdStarted = nil

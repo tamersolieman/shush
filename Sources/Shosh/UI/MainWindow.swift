@@ -42,7 +42,7 @@ struct MainWindow: View {
                         switch section {
                         case .transcriptions: TranscriptionList()
                         case .dictionary: DictionaryPanel()
-                        case .dashboard: ComparisonWindow(controller: controller)
+                        case .dashboard: StatsDashboard()
                         }
                     }
                     .padding(DS.Space.hair)

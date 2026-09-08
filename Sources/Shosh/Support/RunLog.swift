@@ -28,8 +28,15 @@ struct DictationRun: Codable, Sendable, Identifiable {
     /// decode with this nil rather than failing the whole line.
     var corrections: [AppliedCorrection]?
 
+    /// The app that received the text — captured from the frontmost app right before
+    /// injection. Nil for runs recorded before this existed, and for comparison runs
+    /// (nothing is injected in compare mode).
+    var appName: String?
+    var appBundleID: String?
+
     var realtimeFactor: Double { audioSeconds / max(processSeconds, 0.0001) }
     var characters: Int { text.count }
+    var wordCount: Int { text.split { $0.isWhitespace }.count }
 
     init(
         id: UUID = UUID(),
@@ -39,7 +46,9 @@ struct DictationRun: Codable, Sendable, Identifiable {
         processSeconds: Double,
         text: String,
         group: String? = nil,
-        corrections: [AppliedCorrection]? = nil
+        corrections: [AppliedCorrection]? = nil,
+        appName: String? = nil,
+        appBundleID: String? = nil
     ) {
         self.id = id
         self.date = date
@@ -49,6 +58,8 @@ struct DictationRun: Codable, Sendable, Identifiable {
         self.text = text
         self.group = group
         self.corrections = corrections
+        self.appName = appName
+        self.appBundleID = appBundleID
     }
 
     init(from decoder: any Decoder) throws {
@@ -61,6 +72,8 @@ struct DictationRun: Codable, Sendable, Identifiable {
         text = try container.decode(String.self, forKey: .text)
         group = try container.decodeIfPresent(String.self, forKey: .group)
         corrections = try container.decodeIfPresent([AppliedCorrection].self, forKey: .corrections)
+        appName = try container.decodeIfPresent(String.self, forKey: .appName)
+        appBundleID = try container.decodeIfPresent(String.self, forKey: .appBundleID)
     }
 }
 
