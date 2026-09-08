@@ -1,48 +1,51 @@
 import SwiftUI
 
-/// Brand palette. Deliberately minimal for the skeleton — this is the surface the real
-/// branding pass will replace.
+/// Kept as an alias to `DS.Color.primary` rather than removed outright — `Waveform` below
+/// is the only remaining caller, and giving the brand a name keeps that call site readable.
 enum Brand {
-    static let accent = Color(red: 0.42, green: 0.55, blue: 1.0)
-    static let accentWarm = Color(red: 0.76, green: 0.47, blue: 1.0)
-
     static var gradient: LinearGradient {
-        LinearGradient(
-            colors: [accent, accentWarm],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
+        LinearGradient(colors: [DS.Color.primary], startPoint: .leading, endPoint: .trailing)
     }
 }
 
+/// The floating HUD, in the same DS tokens as the rest of the app — a blurred backdrop
+/// (it floats over arbitrary apps/desktops, so it needs the material for legibility) tinted
+/// with the theme's surface color, so light/dark and the explicit override both apply here
+/// too, not just in the main window.
 struct HUDView: View {
     @Bindable var controller: DictationController
+    @State private var settings = Settings.shared
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: DS.Space.roomy) {
             Waveform(level: controller.level, isActive: controller.state == .listening)
-                .frame(width: 76, height: 26)
+                .frame(width: 84, height: 28)
 
             Text(label)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(isError ? Color.red.opacity(0.9) : .primary.opacity(0.85))
+                .font(DS.Font.medium(14))
+                .foregroundStyle(isError ? DS.Color.danger : DS.Color.textPrimary)
                 .lineLimit(2)
                 .truncationMode(.head)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .animation(.easeOut(duration: 0.12), value: controller.transcript)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .frame(width: 340, height: 76)
+        .padding(.horizontal, DS.Space.section)
+        .padding(.vertical, DS.Space.roomy)
+        .frame(width: 420, height: 76)
         .background {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay {
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                        .fill(DS.Color.surface.opacity(0.55))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(DS.Color.border, lineWidth: DS.Border.hairline)
                 }
                 .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
         }
+        .preferredColorScheme(settings.appearance.colorScheme)
     }
 
     private var isError: Bool {
