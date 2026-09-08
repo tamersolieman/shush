@@ -54,6 +54,9 @@ app: build
 	@cp $(BUILD) "$(CONTENTS)/MacOS/$(EXEC)"
 	@cp Resources/Info.plist "$(CONTENTS)/Info.plist"
 	@if [ -f Resources/AppIcon.icns ]; then cp Resources/AppIcon.icns "$(CONTENTS)/Resources/"; fi
+	@# Tajawal (Tamer Solieman Design System) — loaded via ATSApplicationFontsPath.
+	@mkdir -p "$(CONTENTS)/Resources/Fonts"
+	@cp Resources/Fonts/*.ttf "$(CONTENTS)/Resources/Fonts/"
 	@printf 'APPL????' > "$(CONTENTS)/PkgInfo"
 	@# Belt and braces: the staging dir isn't synced, but the copied binary can still carry
 	@# xattrs inherited from the synced .build directory.
