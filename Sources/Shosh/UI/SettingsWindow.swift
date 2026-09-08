@@ -1,4 +1,5 @@
 import Carbon.HIToolbox
+import FluidAudio
 import Speech
 import SwiftUI
 
@@ -22,7 +23,7 @@ struct SettingsWindow: View {
                     HStack(spacing: DS.Space.snug) {
                         ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
                             TransportKey(
-                                title: choice == .apple ? "Apple" : "Parakeet",
+                                title: modelKeyTitle(choice),
                                 isEngaged: settings.engine == choice,
                                 engagedColor: DS.Color.ink
                             ) {
@@ -36,9 +37,7 @@ struct SettingsWindow: View {
                             }
                         }
                     }
-                    note(settings.engine == .apple
-                        ? "Apple's on-device transcriber. Streams text while you speak; no download."
-                        : "Parakeet on the Neural Engine. Resolves on release; ~470 MB model.")
+                    note(modelNote(settings.engine))
                 }
 
                 panel(label: "Cleanup") {
@@ -75,6 +74,22 @@ struct SettingsWindow: View {
             .font(DS.Font.label)
             .foregroundStyle(DS.Color.inkSecondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func modelKeyTitle(_ choice: SpeechEngineChoice) -> String {
+        switch choice {
+        case .apple: "Apple"
+        case .parakeet: "Parakeet"
+        case .cohere: "Cohere"
+        }
+    }
+
+    private func modelNote(_ choice: SpeechEngineChoice) -> String {
+        switch choice {
+        case .apple: "Apple's on-device transcriber. Streams text while you speak; no download."
+        case .parakeet: "Parakeet on the Neural Engine. Resolves on release; ~470 MB model."
+        case .cohere: "Cohere Transcribe. Covers Arabic and 13 other languages Apple and Parakeet don't. Resolves on release."
+        }
     }
 }
 
@@ -274,8 +289,26 @@ private struct SpeechRecognitionCard: View {
     @Bindable var settings: Settings
     @State private var availableLocales: [Locale] = []
 
+    /// Cohere has its own fixed 14-language set (Arabic among them) with its own codes —
+    /// nothing to fetch, unlike Apple's list which depends on the OS build.
+    private var cohereLanguages: [CohereAsrConfig.Language] {
+        CohereAsrConfig.Language.allCases.sorted { $0.englishName < $1.englishName }
+    }
+
     private var currentLabel: String {
-        settings.speechLanguage == "auto" ? "Auto Detect" : displayName(for: settings.speechLanguage)
+        if settings.engine == .cohere {
+            let code = String(settings.speechLanguage.prefix(2)).lowercased()
+            return (CohereAsrConfig.Language(rawValue: code) ?? .english).englishName
+        }
+        return settings.speechLanguage == "auto" ? "Auto Detect" : displayName(for: settings.speechLanguage)
+    }
+
+    private var languageSubtitle: String {
+        switch settings.engine {
+        case .apple: "Which language the recognizer listens for. Auto follows your Mac's language."
+        case .parakeet: "Parakeet doesn't take a language setting — switch engines above to change this."
+        case .cohere: "Which language Cohere Transcribe listens for — includes Arabic."
+        }
     }
 
     var body: some View {
@@ -285,23 +318,27 @@ private struct SpeechRecognitionCard: View {
                 .padding(.top, DS.Space.roomy)
                 .padding(.bottom, DS.Space.base)
 
-            DictationRow(
-                title: "Language",
-                subtitle: settings.engine == .apple
-                    ? "Which language the recognizer listens for. Auto follows your Mac's language."
-                    : "Parakeet is English-only — this only affects the Apple engine."
-            ) {
+            DictationRow(title: "Language", subtitle: languageSubtitle) {
                 HStack(spacing: DS.Space.snug) {
-                    PickerPill(text: currentLabel) {
-                        Button("Auto Detect") { settings.speechLanguage = "auto" }
-                        if !availableLocales.isEmpty { Divider() }
-                        ForEach(availableLocales, id: \.identifier) { locale in
-                            Button(displayName(for: locale.identifier)) {
-                                settings.speechLanguage = locale.identifier
+                    if settings.engine == .cohere {
+                        PickerPill(text: currentLabel) {
+                            ForEach(cohereLanguages, id: \.rawValue) { language in
+                                Button(language.englishName) { settings.speechLanguage = language.rawValue }
                             }
                         }
+                    } else {
+                        PickerPill(text: currentLabel) {
+                            Button("Auto Detect") { settings.speechLanguage = "auto" }
+                            if !availableLocales.isEmpty { Divider() }
+                            ForEach(availableLocales, id: \.identifier) { locale in
+                                Button(displayName(for: locale.identifier)) {
+                                    settings.speechLanguage = locale.identifier
+                                }
+                            }
+                        }
+                        .disabled(settings.engine == .parakeet)
                     }
-                    if settings.speechLanguage != "auto" {
+                    if settings.speechLanguage != "auto", settings.engine != .parakeet {
                         ResetButton { settings.speechLanguage = "auto" }
                     }
                 }

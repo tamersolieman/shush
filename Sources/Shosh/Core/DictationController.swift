@@ -1,6 +1,7 @@
 import ShoshDictionary
 import AVFoundation
 import AppKit
+import FluidAudio
 import Foundation
 import Observation
 
@@ -20,6 +21,10 @@ func engineForCurrentSetting() -> any TranscriptionEngine {
             return AppleSpeechEngine(locale: language == "auto" ? Locale.current : Locale(identifier: language))
         case .parakeet:
             return ParakeetEngine()
+        case .cohere:
+            let language = Settings.shared.speechLanguage
+            let code = String(language.prefix(2)).lowercased()
+            return CohereEngine(language: CohereAsrConfig.Language(rawValue: code) ?? .english)
         }
     }
 }

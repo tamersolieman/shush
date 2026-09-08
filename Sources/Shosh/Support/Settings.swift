@@ -5,15 +5,19 @@ import Observation
 enum SpeechEngineChoice: String, CaseIterable, Sendable {
     case apple
     case parakeet
+    /// The only engine that covers Arabic (plus 13 other languages) — Apple's
+    /// `SpeechTranscriber` and both Parakeet checkpoints don't.
+    case cohere
 
     var displayName: String {
         switch self {
         case .apple: "Apple (streaming)"
         case .parakeet: "Parakeet (batch)"
+        case .cohere: "Cohere Transcribe (batch)"
         }
     }
 
-    /// Apple shows text while you talk; Parakeet only resolves on release.
+    /// Apple shows text while you talk; the batch engines only resolve on release.
     var showsLiveText: Bool { self == .apple }
 }
 

@@ -78,6 +78,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 _ = try? await ParakeetModels.shared.manager()
             }
         }
+        if Settings.shared.engine == .cohere, CohereModels.isDownloaded {
+            Task.detached(priority: .utility) {
+                _ = try? await CohereModels.shared.loaded()
+            }
+        }
 
         // Every `make install` relaunches the app and drops its windows. Restoring the
         // window when it was open last time keeps it from vanishing on each rebuild.
@@ -158,11 +163,18 @@ private struct MenuContent: View {
     @Environment(\.openWindow) private var openWindow
     @State private var isPreloadingParakeet = false
     @State private var parakeetOnDisk = ParakeetModels.isDownloaded
+    @State private var isPreloadingCohere = false
+    @State private var cohereOnDisk = CohereModels.isDownloaded
 
     private var parakeetStatus: String {
         if isPreloadingParakeet { return "Loading Parakeet models…" }
         // Reflects what's actually on disk, not just what this menu instance has done.
         return parakeetOnDisk ? "Parakeet models installed ✓" : "Download Parakeet models…"
+    }
+
+    private var cohereStatus: String {
+        if isPreloadingCohere { return "Loading Cohere models…" }
+        return cohereOnDisk ? "Cohere models installed ✓" : "Download Cohere models…"
     }
 
     private func preloadParakeet() {
@@ -176,6 +188,20 @@ private struct MenuContent: View {
                 Log.speech.error("Parakeet preload failed: \(error.localizedDescription)")
             }
             isPreloadingParakeet = false
+        }
+    }
+
+    private func preloadCohere() {
+        guard !isPreloadingCohere else { return }
+        isPreloadingCohere = true
+        Task {
+            do {
+                _ = try await CohereModels.shared.loaded()
+                cohereOnDisk = CohereModels.isDownloaded
+            } catch {
+                Log.speech.error("Cohere preload failed: \(error.localizedDescription)")
+            }
+            isPreloadingCohere = false
         }
     }
 
@@ -223,6 +249,10 @@ private struct MenuContent: View {
         if settings.engine == .parakeet {
             Button(parakeetStatus) { preloadParakeet() }
                 .disabled(isPreloadingParakeet || parakeetOnDisk)
+        }
+        if settings.engine == .cohere {
+            Button(cohereStatus) { preloadCohere() }
+                .disabled(isPreloadingCohere || cohereOnDisk)
         }
 
         if !Permissions.hasAccessibility {
