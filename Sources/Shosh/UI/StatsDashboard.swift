@@ -12,21 +12,21 @@ struct StatsDashboard: View {
         ScrollView {
             VStack(spacing: DS.Space.roomy) {
                 if store.runs.isEmpty {
-                    EmptyPanel(label: "No stats yet", detail: "Dictate something — the numbers fill in from there.")
+                    EmptyPage(title: "No stats yet", detail: "Dictate something — the numbers fill in from there.")
                         .frame(minHeight: 300)
                 } else {
-                    HStack(alignment: .top, spacing: DS.Space.roomy) {
+                    HStack(alignment: .top, spacing: DS.Space.section) {
                         WordsPerMinuteCard(wpm: stats.wordsPerMinute)
                         FixesCard(stats: stats)
                         TotalWordsCard(stats: stats)
                     }
-                    HStack(alignment: .top, spacing: DS.Space.roomy) {
+                    HStack(alignment: .top, spacing: DS.Space.section) {
                         DesktopUsageCard(usage: stats.appUsage)
                         StreakCard(streak: stats.streak)
                     }
                 }
             }
-            .padding(DS.Space.roomy)
+            .padding(DS.Space.panel)
         }
         .onAppear { store.reload() }
     }
@@ -173,9 +173,29 @@ private struct StatCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: alignment, spacing: DS.Space.base) { content }
-            .padding(DS.Space.roomy)
+            .padding(DS.Space.wide)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(BrushedPanel())
+            .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.card))
+    }
+}
+
+private struct CardDivider: View {
+    var body: some View {
+        Rectangle().fill(DS.Color.divider).frame(height: DS.Border.hairline)
+    }
+}
+
+private struct MetricTitle: View {
+    let text: String
+    var body: some View {
+        Text(text).font(DS.Font.metricTitle).foregroundStyle(DS.Color.textPrimary)
+    }
+}
+
+private struct MetricSubtitle: View {
+    let text: String
+    var body: some View {
+        Text(text).font(DS.Font.metricSubtitle).foregroundStyle(DS.Color.textTertiary)
     }
 }
 
@@ -187,9 +207,9 @@ private struct WordsPerMinuteCard: View {
     var body: some View {
         StatCard {
             Text(wpm > 0 ? "\(Int(wpm.rounded()))" : "—")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-                .foregroundStyle(DS.Color.ink)
-            Silkscreen(text: "Words per minute")
+                .font(DS.Font.metricValue)
+                .foregroundStyle(DS.Color.primary)
+            MetricTitle(text: "Words per minute")
 
             GaugeArc(fraction: min(wpm / scaleMax, 1))
                 .frame(height: 90)
@@ -198,8 +218,7 @@ private struct WordsPerMinuteCard: View {
     }
 }
 
-/// A semicircular progress arc, drawn the same way the VU meter's scale is — a stroked
-/// path, not a system `Gauge` style, so it can carry the app's own tokens.
+/// A semicircular progress arc.
 private struct GaugeArc: View {
     let fraction: Double
 
@@ -210,12 +229,12 @@ private struct GaugeArc: View {
 
             var track = Path()
             track.addArc(center: pivot, radius: radius, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
-            context.stroke(track, with: .color(DS.Color.well), style: StrokeStyle(lineWidth: 10, lineCap: .round))
+            context.stroke(track, with: .color(DS.Color.surfaceSecondary), style: StrokeStyle(lineWidth: 10, lineCap: .round))
 
             var progress = Path()
             let end = 180 - 180 * fraction
             progress.addArc(center: pivot, radius: radius, startAngle: .degrees(180), endAngle: .degrees(end), clockwise: false)
-            context.stroke(progress, with: .color(DS.Color.selectionEdge), style: StrokeStyle(lineWidth: 10, lineCap: .round))
+            context.stroke(progress, with: .color(DS.Color.primary), style: StrokeStyle(lineWidth: 10, lineCap: .round))
         }
     }
 }
@@ -226,23 +245,17 @@ private struct FixesCard: View {
     var body: some View {
         StatCard {
             Text("\(stats.dictionaryFixes)")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-                .foregroundStyle(DS.Color.ink)
-            Silkscreen(text: "Dictionary fixes")
+                .font(DS.Font.metricValue)
+                .foregroundStyle(DS.Color.primary)
+            MetricTitle(text: "Dictionary fixes")
 
-            Rectangle().fill(DS.Color.panelShade).frame(height: DS.Border.hairline).opacity(0.5)
+            CardDivider()
 
-            VStack(alignment: .leading, spacing: DS.Space.snug) {
-                statLine("\(stats.wordsCorrected) words corrected")
-                statLine("\(stats.dictionaryFixes) correction rules fired")
+            VStack(alignment: .leading, spacing: DS.Space.tight) {
+                MetricSubtitle(text: "\(stats.wordsCorrected) words corrected")
+                MetricSubtitle(text: "\(stats.dictionaryFixes) correction rules fired")
             }
         }
-    }
-
-    private func statLine(_ text: String) -> some View {
-        Text(text)
-            .font(DS.Font.body)
-            .foregroundStyle(DS.Color.inkSecondary)
     }
 }
 
@@ -255,22 +268,22 @@ private struct TotalWordsCard: View {
         StatCard {
             HStack(alignment: .top) {
                 Text(stats.totalWords.formatted())
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .foregroundStyle(DS.Color.ink)
+                    .font(DS.Font.metricValue)
+                    .foregroundStyle(DS.Color.primary)
                 Spacer()
                 if let trend = stats.monthOverMonth {
                     TrendBadge(percent: trend)
                 }
             }
-            Silkscreen(text: "Total words dictated")
+            MetricTitle(text: "Total words dictated")
 
-            Rectangle().fill(DS.Color.panelShade).frame(height: DS.Border.hairline).opacity(0.5)
+            CardDivider()
 
             Text(books > 0
                  ? "You've written \(books) complete book\(books == 1 ? "" : "s")!"
                  : "Keep going — \(90_000 - stats.totalWords) words to your first book.")
-                .font(DS.Font.body)
-                .foregroundStyle(DS.Color.inkSecondary)
+                .font(DS.Font.metricSubtitle)
+                .foregroundStyle(DS.Color.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -284,13 +297,11 @@ private struct TrendBadge: View {
             Image(systemName: percent >= 0 ? "arrow.up.right" : "arrow.down.right")
             Text("\(abs(Int(percent.rounded())))% this month")
         }
-        .font(DS.Font.caption)
-        .foregroundStyle(DS.Color.inkSecondary)
+        .font(DS.Font.meta)
+        .foregroundStyle(percent >= 0 ? DS.Color.success : DS.Color.danger)
         .padding(.horizontal, DS.Space.snug)
         .padding(.vertical, DS.Space.hair)
-        .overlay(
-            Capsule().strokeBorder(DS.Color.panelShade, lineWidth: DS.Border.hairline)
-        )
+        .background((percent >= 0 ? DS.Color.success : DS.Color.danger).opacity(0.12), in: .capsule)
     }
 }
 
@@ -301,18 +312,20 @@ private struct DesktopUsageCard: View {
         StatCard {
             HStack(alignment: .firstTextBaseline) {
                 Text("Desktop usage")
-                    .font(DS.Font.title)
-                    .foregroundStyle(DS.Color.ink)
+                    .font(DS.Font.semibold(13))
+                    .foregroundStyle(DS.Color.textPrimary)
                 Spacer()
-                Silkscreen(text: "\(usage.count) apps")
+                Text("\(usage.count) apps")
+                    .font(DS.Font.sectionHeader)
+                    .foregroundStyle(DS.Color.textTertiary)
             }
 
             if usage.isEmpty {
                 Text("Dictate into a few different apps to see this fill in.")
                     .font(DS.Font.label)
-                    .foregroundStyle(DS.Color.inkSecondary)
+                    .foregroundStyle(DS.Color.textSecondary)
             } else {
-                VStack(spacing: DS.Space.snug) {
+                VStack(spacing: DS.Space.base) {
                     ForEach(usage.prefix(6)) { app in
                         AppUsageRow(app: app)
                     }
@@ -330,26 +343,27 @@ private struct AppUsageRow: View {
             AppIcon(bundleID: app.bundleID)
                 .frame(width: 20, height: 20)
 
+            Text(app.name)
+                .font(DS.Font.body)
+                .foregroundStyle(DS.Color.textPrimary)
+                .lineLimit(1)
+                .frame(width: 110, alignment: .leading)
+
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: DS.Radius.chip)
-                        .fill(DS.Color.well)
+                        .fill(DS.Color.surfaceSecondary)
                     RoundedRectangle(cornerRadius: DS.Radius.chip)
-                        .fill(DS.Color.selectionEdge)
-                        .frame(width: max(geo.size.width * app.fraction, 28))
-                    Text("\(Int((app.fraction * 100).rounded()))%")
-                        .font(DS.Font.caption)
-                        .foregroundStyle(.white)
-                        .padding(.leading, DS.Space.snug)
+                        .fill(DS.Color.primary)
+                        .frame(width: max(geo.size.width * app.fraction, 4))
                 }
             }
-            .frame(height: 26)
+            .frame(height: 8)
 
-            Text("\(app.runCount) · \(app.name)")
-                .font(DS.Font.label)
-                .foregroundStyle(DS.Color.inkSecondary)
-                .lineLimit(1)
-                .frame(width: 130, alignment: .leading)
+            Text("\(Int((app.fraction * 100).rounded()))%")
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
+                .frame(width: 36, alignment: .trailing)
         }
     }
 }
@@ -364,7 +378,7 @@ private struct AppIcon: View {
             Image(nsImage: image).resizable().scaledToFit()
         } else {
             Image(systemName: "app.dashed")
-                .foregroundStyle(DS.Color.inkSecondary)
+                .foregroundStyle(DS.Color.textSecondary)
         }
     }
 }
@@ -390,22 +404,24 @@ private struct StreakCard: View {
         StatCard {
             HStack(alignment: .firstTextBaseline) {
                 Text("\(streak.current) day streak")
-                    .font(DS.Font.title)
-                    .foregroundStyle(DS.Color.ink)
+                    .font(DS.Font.semibold(13))
+                    .foregroundStyle(DS.Color.textPrimary)
                 Spacer()
-                Silkscreen(text: "Longest \(streak.longest) days")
+                Text("Longest \(streak.longest) days")
+                    .font(DS.Font.sectionHeader)
+                    .foregroundStyle(DS.Color.textTertiary)
             }
 
             StreakGrid(days: streak.days, weeks: streak.weeksSpanned)
 
             HStack(spacing: DS.Space.tight) {
-                Silkscreen(text: "Less")
+                Text("Less").font(DS.Font.meta).foregroundStyle(DS.Color.textTertiary)
                 ForEach(0..<4) { level in
-                    RoundedRectangle(cornerRadius: DS.Radius.chip)
-                        .fill(DS.Color.selectionEdge.opacity(intensity(for: level)))
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(DS.Color.primary.opacity(intensity(for: level)))
                         .frame(width: 12, height: 12)
                 }
-                Silkscreen(text: "More")
+                Text("More").font(DS.Font.meta).foregroundStyle(DS.Color.textTertiary)
             }
         }
     }
@@ -454,8 +470,8 @@ private struct StreakGrid: View {
     }
 
     private func color(for day: StreakDay?) -> Color {
-        guard let day, day.count > 0 else { return DS.Color.well }
+        guard let day, day.count > 0 else { return DS.Color.surfaceSecondary }
         let intensity = min(Double(day.count) / Double(maxCount), 1.0)
-        return DS.Color.selectionEdge.opacity(0.25 + intensity * 0.75)
+        return DS.Color.primary.opacity(0.25 + intensity * 0.75)
     }
 }

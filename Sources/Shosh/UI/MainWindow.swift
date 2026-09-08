@@ -2,85 +2,151 @@ import ShoshDictionary
 import AppKit
 import SwiftUI
 
-/// The app's main window — the front panel of the unit.
-///
-/// Laid out the way a deck is: transport and meter across the top on the panel itself, then
-/// a recessed well below holding whichever section is selected. The section selector is a
-/// row of keys, not a segmented control, because everything else here is a physical control
-/// and one piece of stock UI would give the whole thing away.
+/// The app's main window — a persistent left sidebar plus a content area whose top bar and
+/// body change per section. Matches the Pencil design (`shosh_app.pen`): Dashboard,
+/// Transcripts, Dictionary and Settings all live behind the same sidebar nav rather than
+/// Settings being a separate window.
 struct MainWindow: View {
     @Bindable var controller: DictationController
 
-    @State private var section: Section = .transcriptions
+    @State private var section: Section = .dashboard
 
     enum Section: String, CaseIterable, Identifiable {
-        case transcriptions
-        case dictionary
-        case dashboard
+        case dashboard, transcripts, dictionary, settings
 
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .transcriptions: "Transcriptions"
-            case .dictionary: "Dictionary"
             case .dashboard: "Dashboard"
+            case .transcripts: "Transcripts"
+            case .dictionary: "Dictionary"
+            case .settings: "Settings"
+            }
+        }
+        var icon: String {
+            switch self {
+            case .dashboard: "square.grid.2x2"
+            case .transcripts: "text.bubble"
+            case .dictionary: "book.closed"
+            case .settings: "gearshape"
             }
         }
     }
 
     var body: some View {
-        ZStack {
-            DS.Color.chassis.ignoresSafeArea()
-
-            VStack(spacing: DS.Space.base) {
-                TransportPanel(controller: controller)
-
-                sectionKeys
-
-                Well {
-                    Group {
-                        switch section {
-                        case .transcriptions: TranscriptionList()
-                        case .dictionary: DictionaryPanel()
-                        case .dashboard: StatsDashboard()
-                        }
-                    }
-                    .padding(DS.Space.hair)
-                }
-                .frame(maxHeight: .infinity)
-            }
-            .padding(DS.Space.roomy)
+        HStack(spacing: 0) {
+            Sidebar(section: $section)
+            ContentArea(controller: controller, section: section)
         }
-        .frame(minWidth: 720, minHeight: 520)
-    }
-
-    private var sectionKeys: some View {
-        HStack(spacing: DS.Space.snug) {
-            ForEach(Section.allCases) { candidate in
-                TransportKey(
-                    title: candidate.title,
-                    isEngaged: section == candidate,
-                    engagedColor: DS.Color.ink
-                ) {
-                    withAnimation(DS.Motion.panel) { section = candidate }
-                }
-                .background {
-                    if section == candidate {
-                        RoundedRectangle(cornerRadius: DS.Radius.control)
-                            .fill(DS.Color.selection)
-                    }
-                }
-            }
-            Spacer()
-            Vents(count: 8)
-        }
+        .frame(minWidth: 960, minHeight: 640)
+        .background(DS.Color.background)
     }
 }
 
-// MARK: - Transport
+// MARK: - Sidebar
 
-/// Record / stop, the level meter, and the counter — the top of the unit.
-private struct TransportPanel: View {
+private struct Sidebar: View {
+    @Binding var section: MainWindow.Section
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.section) {
+            Text("Shosh")
+                .font(DS.Font.logo)
+                .foregroundStyle(DS.Color.primary)
+
+            VStack(alignment: .leading, spacing: DS.Space.snug) {
+                ForEach(MainWindow.Section.allCases) { candidate in
+                    NavRow(section: candidate, isSelected: section == candidate) {
+                        section = candidate
+                    }
+                }
+            }
+
+            Spacer()
+        }
+        .padding(DS.Space.wide)
+        .frame(width: 240)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(DS.Color.sidebarBackground)
+    }
+}
+
+private struct NavRow: View {
+    let section: MainWindow.Section
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: DS.Space.base) {
+                Image(systemName: section.icon)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(isSelected ? DS.Color.primary : DS.Color.textSecondary)
+                    .frame(width: 16)
+                Text(section.title)
+                    .font(DS.Font.navLabel)
+                    .foregroundStyle(isSelected ? DS.Color.primary : DS.Color.textPrimary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, DS.Space.base)
+            .frame(height: 40)
+            .background(isSelected ? DS.Color.primaryLight : .clear, in: .rect(cornerRadius: DS.Radius.control))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Content area
+
+private struct ContentArea: View {
+    @Bindable var controller: DictationController
+    let section: MainWindow.Section
+
+    var body: some View {
+        VStack(spacing: 0) {
+            TopBar(controller: controller, section: section)
+
+            switch section {
+            case .dashboard: StatsDashboard()
+            case .transcripts: TranscriptionsPage(controller: controller)
+            case .dictionary: DictionaryPanel()
+            case .settings: SettingsPageView(controller: controller)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(DS.Color.background)
+    }
+}
+
+private struct TopBar: View {
+    @Bindable var controller: DictationController
+    let section: MainWindow.Section
+
+    var body: some View {
+        HStack {
+            Text(section.title)
+                .font(DS.Font.pageTitle)
+                .foregroundStyle(DS.Color.textPrimary)
+
+            Spacer()
+
+            switch section {
+            case .dashboard, .transcripts:
+                RecordControl(controller: controller)
+            case .dictionary:
+                EmptyView()
+            case .settings:
+                EmptyView()
+            }
+        }
+        .padding(.horizontal, DS.Space.panel)
+        .frame(height: 60)
+    }
+}
+
+/// Record button + elapsed timer, shown on Dashboard and Transcripts — the two pages where
+/// seeing your history makes "start another one" natural.
+private struct RecordControl: View {
     @Bindable var controller: DictationController
 
     @State private var elapsed: TimeInterval = 0
@@ -89,54 +155,33 @@ private struct TransportPanel: View {
     private var isRecording: Bool { controller.state.isActive }
 
     var body: some View {
-        HStack(spacing: DS.Space.roomy) {
-            VStack(alignment: .leading, spacing: DS.Space.snug) {
-                Silkscreen(text: "Transport")
+        HStack(spacing: DS.Space.base) {
+            if isRecording {
+                Text(counterText)
+                    .font(DS.Font.counter)
+                    .foregroundStyle(DS.Color.textPrimary)
+            }
+            Button {
+                if isRecording {
+                    controller.stopButtonRecording()
+                } else {
+                    controller.startButtonRecording()
+                }
+            } label: {
                 HStack(spacing: DS.Space.snug) {
-                    TransportKey(
-                        title: isRecording ? "Stop" : "Record",
-                        systemImage: isRecording ? "stop.fill" : "circle.fill",
-                        isEngaged: isRecording
-                    ) {
-                        if isRecording {
-                            controller.stopButtonRecording()
-                        } else {
-                            controller.startButtonRecording()
-                        }
-                    }
-
-                    HStack(spacing: DS.Space.tight) {
-                        Lamp(color: DS.Color.record, isLit: isRecording)
-                        Silkscreen(text: "Rec")
-                    }
-                    .padding(.leading, DS.Space.tight)
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 8, height: 8)
+                    Text(isRecording ? "Stop" : "Record")
+                        .font(DS.Font.button)
+                        .foregroundStyle(.white)
                 }
+                .padding(.horizontal, DS.Space.roomy)
+                .frame(height: 36)
+                .background(isRecording ? DS.Color.danger : DS.Color.primary, in: .rect(cornerRadius: DS.Radius.control))
             }
-
-            VStack(alignment: .leading, spacing: DS.Space.tight) {
-                Silkscreen(text: "Level")
-                VUMeter(level: controller.level, isActive: isRecording)
-                    .frame(width: 168, height: 54)
-            }
-
-            VStack(alignment: .leading, spacing: DS.Space.tight) {
-                Silkscreen(text: "Counter")
-                DeckWindow {
-                    Readout(text: counterText, large: true)
-                        .padding(.horizontal, DS.Space.base)
-                        .padding(.vertical, DS.Space.snug)
-                }
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: DS.Space.snug) {
-                Screw()
-                Screw()
-            }
+            .buttonStyle(.plain)
         }
-        .padding(DS.Space.roomy)
-        .background(BrushedPanel())
         .onChange(of: controller.state.isActive) { _, active in
             startedAt = active ? Date() : nil
             if !active { elapsed = 0 }
@@ -150,23 +195,21 @@ private struct TransportPanel: View {
         }
     }
 
-    /// Minutes and seconds, zero-padded, the way a tape counter reads.
     private var counterText: String {
         let total = Int(elapsed)
         return String(format: "%02d:%02d", total / 60, total % 60)
     }
 }
 
-// MARK: - Transcriptions
+// MARK: - Transcripts page
 
-/// Past transcriptions, searchable, each copyable.
-private struct TranscriptionList: View {
+private struct TranscriptionsPage: View {
+    @Bindable var controller: DictationController
     @State private var store = RunStore.shared
     @State private var query = ""
-    @State private var isConfirmingClear = false
 
     private var runs: [DictationRun] {
-        let all = store.runs.reversed().map { $0 }
+        let all = Array(store.runs.reversed())
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return all }
         return all.filter { $0.text.localizedStandardContains(trimmed) }
@@ -174,225 +217,115 @@ private struct TranscriptionList: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SearchField(text: $query, placeholder: "Search transcriptions")
+            SearchBar(text: $query, placeholder: "Search transcripts")
 
             if runs.isEmpty {
-                EmptyPanel(
-                    label: store.runs.isEmpty ? "No recordings" : "No matches",
-                    detail: store.runs.isEmpty ? "Press Record to start." : "Try a different search."
+                EmptyPage(
+                    title: store.runs.isEmpty ? "No transcripts yet" : "No matches",
+                    detail: store.runs.isEmpty ? "Hit Record to start dictating." : "Try a different search."
                 )
             } else {
                 ScrollView {
-                    LazyVStack(spacing: DS.Space.snug) {
+                    LazyVStack(spacing: DS.Space.base) {
                         ForEach(runs) { run in
-                            TranscriptionRow(run: run) {
-                                withAnimation(DS.Motion.panel) { RunLog.delete(run) }
+                            TranscriptCard(run: run) {
+                                withAnimation(DS.Motion.base) { RunLog.delete(run) }
                             }
                         }
                     }
-                    .padding(DS.Space.base)
+                    .padding(DS.Space.panel)
                 }
-                footer
             }
-        }
-    }
-
-    private var footer: some View {
-        HStack {
-            Silkscreen(
-                text: "\(store.runs.count) recording\(store.runs.count == 1 ? "" : "s")",
-                color: DS.Color.inkOnDeck.opacity(0.5)
-            )
-            Spacer()
-            Button { isConfirmingClear = true } label: {
-                Silkscreen(text: "Delete all", color: DS.Color.inkOnDeck.opacity(0.5))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, DS.Space.base)
-        .padding(.vertical, DS.Space.snug)
-        .background(DS.Color.deck)
-        .overlay(alignment: .top) {
-            Rectangle().fill(DS.Color.seam).frame(height: DS.Border.seam)
-        }
-        // Confirmed, unlike a single row: one row is trivially re-recorded, the whole
-        // history is not, and there's no undo.
-        .confirmationDialog(
-            "Delete all \(store.runs.count) recordings?",
-            isPresented: $isConfirmingClear,
-            titleVisibility: .visible
-        ) {
-            Button("Delete All", role: .destructive) { RunLog.clear() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This can't be undone.")
         }
     }
 }
 
-private struct TranscriptionRow: View {
+private struct TranscriptCard: View {
     let run: DictationRun
     let onDelete: () -> Void
 
     @State private var didCopy = false
-    @State private var isHovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.snug) {
-            HStack(spacing: DS.Space.snug) {
-                Silkscreen(text: run.engine, color: DS.Color.inkOnDeck.opacity(0.7))
-                Readout(text: String(format: "%.2fs", run.processSeconds))
-                    .foregroundStyle(DS.Color.inkOnDeck.opacity(0.6))
-                Spacer()
-                Text(run.date, style: .time)
-                    .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.inkOnDeck.opacity(0.5))
-                copyButton
-                deleteButton
-                    .opacity(isHovering ? 1 : 0)
-            }
-
             Text(run.text)
                 .font(DS.Font.body)
-                .foregroundStyle(DS.Color.inkOnDeck)
+                .foregroundStyle(DS.Color.textPrimary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
 
-            if let corrections = run.corrections, !corrections.isEmpty {
-                CorrectionBadges(corrections: corrections)
-            }
-        }
-        .padding(DS.Space.base)
-        .background {
-            DeckWindow { Color.clear }
-                .opacity(isHovering ? 0.85 : 1)
-        }
-        .onHover { isHovering = $0 }
-    }
-
-    private var copyButton: some View {
-        Button {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(run.text, forType: .string)
-            didCopy = true
-            Task {
-                try? await Task.sleep(for: .seconds(1.4))
-                didCopy = false
-            }
-        } label: {
-            Silkscreen(
-                text: didCopy ? "Copied" : "Copy",
-                color: DS.Color.inkOnDeck.opacity(didCopy ? 1 : 0.6)
-            )
-            .padding(.horizontal, DS.Space.snug)
-            .padding(.vertical, DS.Space.tight)
-            .overlay(
-                RoundedRectangle(cornerRadius: DS.Radius.chip)
-                    .strokeBorder(DS.Color.inkOnDeck.opacity(0.3), lineWidth: DS.Border.hairline)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// Appears on hover only, and deletes without a confirmation — a single transcript is
-    /// cheap to redo, and a dialog on every row would make tidying up tedious. The
-    /// irreversible one is "Delete all", which does confirm.
-    private var deleteButton: some View {
-        Button(action: onDelete) {
-            Image(systemName: "trash")
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(DS.Color.inkOnDeck.opacity(0.55))
-                .padding(.horizontal, DS.Space.snug)
-                .padding(.vertical, DS.Space.tight)
-                .overlay(
-                    RoundedRectangle(cornerRadius: DS.Radius.chip)
-                        .strokeBorder(DS.Color.inkOnDeck.opacity(0.3), lineWidth: DS.Border.hairline)
-                )
-        }
-        .buttonStyle(.plain)
-        .help("Delete this transcription")
-    }
-}
-
-/// Shows that the dictionary fired, and on what. Without this the dictionary is invisible
-/// and you can't tell a rule that works from one that never matches.
-private struct CorrectionBadges: View {
-    let corrections: [AppliedCorrection]
-
-    var body: some View {
-        HStack(spacing: DS.Space.snug) {
-            Silkscreen(text: "Corrected", color: DS.Color.meterAmber)
-            ForEach(corrections, id: \.self) { correction in
-                HStack(spacing: DS.Space.tight) {
-                    Text(correction.from)
-                        .strikethrough()
-                        .foregroundStyle(DS.Color.inkOnDeck.opacity(0.5))
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(DS.Color.inkOnDeck.opacity(0.4))
-                    Text(correction.to)
-                        .foregroundStyle(DS.Color.inkOnDeck)
-                    if correction.count > 1 {
-                        Text("×\(correction.count)")
-                            .foregroundStyle(DS.Color.inkOnDeck.opacity(0.5))
+            HStack(spacing: DS.Space.base) {
+                Text("\(run.engine) · \(run.date.formatted(date: .omitted, time: .shortened))")
+                    .font(DS.Font.meta)
+                    .foregroundStyle(DS.Color.textTertiary)
+                Spacer()
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(run.text, forType: .string)
+                    didCopy = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.2))
+                        didCopy = false
                     }
+                } label: {
+                    Text(didCopy ? "Copied" : "Copy")
+                        .font(DS.Font.meta)
+                        .foregroundStyle(DS.Color.textSecondary)
+                        .padding(.horizontal, DS.Space.snug)
+                        .frame(height: 24)
+                        .background(DS.Color.surfaceSecondary, in: .rect(cornerRadius: DS.Radius.chip))
                 }
-                .font(DS.Font.caption)
-                .padding(.horizontal, DS.Space.snug)
-                .padding(.vertical, DS.Space.hair)
-                .overlay(
-                    RoundedRectangle(cornerRadius: DS.Radius.chip)
-                        .strokeBorder(DS.Color.meterAmber.opacity(0.35), lineWidth: DS.Border.hairline)
-                )
+                .buttonStyle(.plain)
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 10))
+                        .foregroundStyle(DS.Color.textSecondary)
+                }
+                .buttonStyle(.plain)
             }
-            Spacer()
         }
+        .padding(DS.Space.roomy)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.card))
     }
 }
 
 // MARK: - Shared
 
-struct SearchField: View {
+struct SearchBar: View {
     @Binding var text: String
     let placeholder: String
 
     var body: some View {
-        HStack(spacing: DS.Space.snug) {
+        HStack(spacing: DS.Space.base) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(DS.Color.inkOnDeck.opacity(0.5))
+                .font(.system(size: 12))
+                .foregroundStyle(DS.Color.textSecondary)
             TextField(placeholder, text: $text)
                 .textFieldStyle(.plain)
                 .font(DS.Font.body)
-                .foregroundStyle(DS.Color.inkOnDeck)
-            if !text.isEmpty {
-                Button { text = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(DS.Color.inkOnDeck.opacity(0.4))
-                }
-                .buttonStyle(.plain)
-            }
+                .foregroundStyle(DS.Color.textPrimary)
         }
         .padding(.horizontal, DS.Space.base)
-        .padding(.vertical, DS.Space.snug)
-        .background(DS.Color.deck)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(DS.Color.seam).frame(height: DS.Border.seam)
-        }
+        .frame(height: 36)
+        .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.control))
+        .padding(.horizontal, DS.Space.panel)
+        .padding(.vertical, DS.Space.roomy)
     }
 }
 
-struct EmptyPanel: View {
-    let label: String
+struct EmptyPage: View {
+    let title: String
     let detail: String
 
     var body: some View {
         VStack(spacing: DS.Space.snug) {
-            Silkscreen(text: label, large: true, color: DS.Color.inkOnDeck.opacity(0.55))
-            Text(detail)
+            Text(title)
                 .font(DS.Font.label)
-                .foregroundStyle(DS.Color.inkOnDeck.opacity(0.4))
+                .foregroundStyle(DS.Color.textPrimary)
+            Text(detail)
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

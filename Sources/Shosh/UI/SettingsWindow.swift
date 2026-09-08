@@ -3,103 +3,114 @@ import FluidAudio
 import Speech
 import SwiftUI
 
-/// Settings — hotkey and model, per the brief. Opens on ⌘, via the standard `Settings` scene,
-/// so the system wires up the menu item and the shortcut.
-struct SettingsWindow: View {
+/// Settings, embedded both as a sidebar page in the main window and — for the standard
+/// ⌘, shortcut — its own window. Matches the Pencil design: section header, thin divider,
+/// flat rows (label left, value/chevron or a toggle right), no card chrome.
+struct SettingsPageView: View {
     @Bindable var controller: DictationController
     @State private var settings = Settings.shared
 
     var body: some View {
-        ZStack {
-            DS.Color.chassis.ignoresSafeArea()
-
-            ScrollView {
-            VStack(alignment: .leading, spacing: DS.Space.wide) {
-                DictationCard(controller: controller, settings: settings)
-                SpeechRecognitionCard(settings: settings)
-                AudioSettingsCard(settings: settings)
-
-                panel(label: "Model") {
-                    HStack(spacing: DS.Space.snug) {
-                        ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
-                            TransportKey(
-                                title: modelKeyTitle(choice),
-                                isEngaged: settings.engine == choice,
-                                engagedColor: DS.Color.ink
-                            ) {
-                                settings.engine = choice
-                            }
-                            .background {
-                                if settings.engine == choice {
-                                    RoundedRectangle(cornerRadius: DS.Radius.control)
-                                        .fill(DS.Color.selection)
-                                }
-                            }
-                        }
-                    }
-                    note(modelNote(settings.engine))
-                }
-
-                panel(label: "Cleanup") {
-                    Toggle(isOn: $settings.cleanupEnabled) {
-                        Silkscreen(text: "Clean up transcripts")
-                    }
-                    .toggleStyle(.switch)
-                    note("Strips fillers, fixes spacing and punctuation. The dictionary's "
-                        + "corrections run either way.")
-                }
-
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                DictationSection(controller: controller, settings: settings)
+                SpeechRecognitionSection(settings: settings)
+                AudioSection(settings: settings)
+                ModelSection(settings: settings)
+                CleanupSection(settings: settings)
             }
             .padding(DS.Space.panel)
-            }
-        }
-        .frame(width: 520, height: 640)
-    }
-
-    private func panel<Content: View>(
-        label: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: DS.Space.base) {
-            Silkscreen(text: label, large: true)
-            content()
-        }
-        .padding(DS.Space.roomy)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(BrushedPanel())
-    }
-
-    private func note(_ text: String) -> some View {
-        Text(text)
-            .font(DS.Font.label)
-            .foregroundStyle(DS.Color.inkSecondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func modelKeyTitle(_ choice: SpeechEngineChoice) -> String {
-        switch choice {
-        case .apple: "Apple"
-        case .parakeet: "Parakeet"
-        case .cohere: "Cohere"
-        }
-    }
-
-    private func modelNote(_ choice: SpeechEngineChoice) -> String {
-        switch choice {
-        case .apple: "Apple's on-device transcriber. Streams text while you speak; no download."
-        case .parakeet: "Parakeet on the Neural Engine. Resolves on release; ~470 MB model."
-        case .cohere: "Cohere Transcribe. Covers Arabic and 13 other languages Apple and Parakeet don't. Resolves on release."
         }
     }
 }
 
-// MARK: - Dictation card
+/// The standalone ⌘, window — a thin wrapper around `SettingsPageView` so both entry points
+/// share one implementation.
+struct SettingsWindow: View {
+    @Bindable var controller: DictationController
 
-/// A grouped settings card in the style of a shortcut-recorder panel: a section label, then
-/// rows — title and subtitle on the left, a single control on the right — divided by
-/// hairlines. Same panel/ink tokens as the rest of Settings, so it follows the app's own
-/// light/dark face rather than forcing one.
-private struct DictationCard: View {
+    var body: some View {
+        SettingsPageView(controller: controller)
+            .background(DS.Color.background)
+            .frame(width: 640, height: 720)
+    }
+}
+
+// MARK: - Shared row scaffolding
+
+private struct SectionHeader: View {
+    let title: String
+    var body: some View {
+        Text(title.uppercased())
+            .font(DS.Font.sectionHeader)
+            .foregroundStyle(DS.Color.textTertiary)
+            .padding(.top, DS.Space.section)
+            .padding(.bottom, DS.Space.snug)
+        Rectangle().fill(DS.Color.divider).frame(height: DS.Border.hairline)
+    }
+}
+
+private struct SettingsRow<Control: View>: View {
+    let title: String
+    var value: String?
+    @ViewBuilder var control: Control
+
+    var body: some View {
+        HStack(alignment: .center, spacing: DS.Space.roomy) {
+            Text(title)
+                .font(DS.Font.label)
+                .foregroundStyle(DS.Color.textPrimary)
+            Spacer(minLength: DS.Space.roomy)
+            control
+        }
+        .padding(.horizontal, DS.Space.base)
+        .frame(height: 52)
+    }
+}
+
+/// A settings row whose control is "value text + chevron" — the whole row opens a menu.
+private struct MenuRow<MenuItems: View>: View {
+    let title: String
+    let value: String
+    @ViewBuilder var menuItems: MenuItems
+
+    var body: some View {
+        SettingsRow(title: title) {
+            Menu {
+                menuItems
+            } label: {
+                HStack(spacing: DS.Space.tight) {
+                    Text(value)
+                        .font(DS.Font.value)
+                        .foregroundStyle(DS.Color.textTertiary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(DS.Color.textSecondary)
+                }
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        }
+    }
+}
+
+private struct ToggleRow: View {
+    let title: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        SettingsRow(title: title) {
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(DS.Color.primary)
+        }
+    }
+}
+
+// MARK: - Dictation
+
+private struct DictationSection: View {
     @Bindable var controller: DictationController
     @Bindable var settings: Settings
 
@@ -107,71 +118,42 @@ private struct DictationCard: View {
     @State private var isRecording = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Silkscreen(text: "Dictation", large: true)
-                .padding(.horizontal, DS.Space.roomy)
-                .padding(.top, DS.Space.roomy)
-                .padding(.bottom, DS.Space.base)
+        SectionHeader(title: "Dictation")
 
-            DictationRow(
-                title: "Transcribe Shortcut",
-                subtitle: isRecording
-                    ? "Press any key or modifier — Escape cancels without changing it."
-                    : "The keyboard shortcut to record and transcribe your voice."
-            ) {
-                HStack(spacing: DS.Space.snug) {
-                    ShortcutPill(
-                        text: isRecording ? "Press any key…" : settings.pushToTalkKey.displayName,
-                        isActive: isRecording
-                    ) {
-                        beginRecording()
-                    }
-                    if !isRecording, settings.pushToTalkKey != .default {
-                        ResetButton {
-                            settings.pushToTalkKey = .default
-                            controller.reloadHotkey()
-                        }
+        SettingsRow(title: "Transcribe Shortcut") {
+            HStack(spacing: DS.Space.snug) {
+                Button {
+                    beginRecording()
+                } label: {
+                    Text(isRecording ? "Press any key…" : settings.pushToTalkKey.displayName)
+                        .font(DS.Font.value)
+                        .foregroundStyle(isRecording ? DS.Color.primary : DS.Color.textTertiary)
+                }
+                .buttonStyle(.plain)
+                if !isRecording, settings.pushToTalkKey != .default {
+                    ResetButton {
+                        settings.pushToTalkKey = .default
+                        controller.reloadHotkey()
                     }
                 }
             }
-
-            divider
-
-            DictationRow(
-                title: "Push To Talk",
-                subtitle: "Hold to record, release to stop"
-            ) {
-                Toggle("", isOn: $settings.pushToTalkEnabled)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-            }
-
-            divider
-
-            DictationRow(
-                title: "Cancel Shortcut",
-                subtitle: "The keyboard shortcut to cancel the current recording."
-            ) {
-                ShortcutPill(text: "Escape", isStatic: true) {}
-            }
         }
-        .background(BrushedPanel())
-    }
+        CardDivider()
 
-    private var divider: some View {
-        Rectangle()
-            .fill(DS.Color.seam)
-            .frame(height: DS.Border.hairline)
-            .opacity(0.5)
-            .padding(.leading, DS.Space.roomy)
+        ToggleRow(title: "Push To Talk", isOn: $settings.pushToTalkEnabled)
+        CardDivider()
+
+        SettingsRow(title: "Cancel Shortcut") {
+            Text("Escape")
+                .font(DS.Font.value)
+                .foregroundStyle(DS.Color.textTertiary)
+        }
     }
 
     private func beginRecording() {
         isRecording = true
         recorder.start { captured in
             isRecording = false
-            // Escape is the universal "never mind" key — capturing it reassigns nothing,
-            // it just backs out of recording.
             guard captured.keyCode != Int64(kVK_Escape) else { return }
             settings.pushToTalkKey = captured
             controller.reloadHotkey()
@@ -179,118 +161,12 @@ private struct DictationCard: View {
     }
 }
 
-private struct DictationRow<Control: View>: View {
-    let title: String
-    let subtitle: String
-    @ViewBuilder let control: Control
+// MARK: - Speech recognition
 
-    var body: some View {
-        HStack(alignment: .center, spacing: DS.Space.roomy) {
-            VStack(alignment: .leading, spacing: DS.Space.hair) {
-                Text(title)
-                    .font(DS.Font.bodyEmphasis)
-                    .foregroundStyle(DS.Color.ink)
-                Text(subtitle)
-                    .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.inkSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: DS.Space.roomy)
-            control
-        }
-        .padding(.horizontal, DS.Space.roomy)
-        .padding(.vertical, DS.Space.base)
-    }
-}
-
-/// A shortcut-recorder-style pill: rounded, bordered, the key name centered. `isActive`
-/// draws it with the selection edge color while it's listening for a key.
-private struct ShortcutPill: View {
-    let text: String
-    var isActive = false
-    var isStatic = false
-    var action: () -> Void = {}
-
-    var body: some View {
-        Button(action: action) {
-            Text(text)
-                .font(DS.Font.bodyEmphasis)
-                .foregroundStyle(isActive ? DS.Color.selectionEdge : DS.Color.ink)
-                .padding(.horizontal, DS.Space.base)
-                .padding(.vertical, DS.Space.tight)
-                .frame(minWidth: 44)
-                .overlay(
-                    RoundedRectangle(cornerRadius: DS.Radius.control)
-                        .strokeBorder(isActive ? DS.Color.selectionEdge : DS.Color.panelShade, lineWidth: DS.Border.hairline)
-                )
-        }
-        .buttonStyle(.plain)
-        .disabled(isStatic)
-    }
-}
-
-private struct ResetButton: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(DS.Color.inkSecondary)
-        }
-        .buttonStyle(.plain)
-        .help("Reset to default")
-    }
-}
-
-private struct CardDivider: View {
-    var body: some View {
-        Rectangle()
-            .fill(DS.Color.seam)
-            .frame(height: DS.Border.hairline)
-            .opacity(0.5)
-            .padding(.leading, DS.Space.roomy)
-    }
-}
-
-/// A dropdown, styled like `ShortcutPill` — bordered, rounded, a chevron in place of an
-/// active-recording state.
-private struct PickerPill<MenuItems: View>: View {
-    let text: String
-    @ViewBuilder var menuItems: MenuItems
-
-    var body: some View {
-        Menu {
-            menuItems
-        } label: {
-            HStack(spacing: DS.Space.tight) {
-                Text(text)
-                    .font(DS.Font.bodyEmphasis)
-                    .foregroundStyle(DS.Color.ink)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(DS.Color.inkSecondary)
-            }
-            .padding(.horizontal, DS.Space.base)
-            .padding(.vertical, DS.Space.tight)
-            .overlay(
-                RoundedRectangle(cornerRadius: DS.Radius.control)
-                    .strokeBorder(DS.Color.panelShade, lineWidth: DS.Border.hairline)
-            )
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-    }
-}
-
-// MARK: - Speech recognition card
-
-private struct SpeechRecognitionCard: View {
+private struct SpeechRecognitionSection: View {
     @Bindable var settings: Settings
     @State private var availableLocales: [Locale] = []
 
-    /// Cohere has its own fixed 14-language set (Arabic among them) with its own codes —
-    /// nothing to fetch, unlike Apple's list which depends on the OS build.
     private var cohereLanguages: [CohereAsrConfig.Language] {
         CohereAsrConfig.Language.allCases.sorted { $0.englishName < $1.englishName }
     }
@@ -303,62 +179,49 @@ private struct SpeechRecognitionCard: View {
         return settings.speechLanguage == "auto" ? "Auto Detect" : displayName(for: settings.speechLanguage)
     }
 
-    private var languageSubtitle: String {
-        switch settings.engine {
-        case .apple: "Which language the recognizer listens for. Auto follows your Mac's language."
-        case .parakeet: "Parakeet doesn't take a language setting — switch engines above to change this."
-        case .cohere: "Which language Cohere Transcribe listens for — includes Arabic."
-        }
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Silkscreen(text: "Speech Recognition", large: true)
-                .padding(.horizontal, DS.Space.roomy)
-                .padding(.top, DS.Space.roomy)
-                .padding(.bottom, DS.Space.base)
+        SectionHeader(title: "Speech Recognition")
 
-            DictationRow(title: "Language", subtitle: languageSubtitle) {
-                HStack(spacing: DS.Space.snug) {
-                    if settings.engine == .cohere {
-                        PickerPill(text: currentLabel) {
-                            ForEach(cohereLanguages, id: \.rawValue) { language in
-                                Button(language.englishName) { settings.speechLanguage = language.rawValue }
+        SettingsRow(title: "Language") {
+            HStack(spacing: DS.Space.snug) {
+                if settings.engine == .cohere {
+                    MenuRow(title: "", value: currentLabel) {
+                        ForEach(cohereLanguages, id: \.rawValue) { language in
+                            Button(language.englishName) { settings.speechLanguage = language.rawValue }
+                        }
+                    }
+                } else if settings.engine == .parakeet {
+                    Text("Not supported").font(DS.Font.value).foregroundStyle(DS.Color.textTertiary)
+                } else {
+                    Menu {
+                        Button("Auto Detect") { settings.speechLanguage = "auto" }
+                        if !availableLocales.isEmpty { Divider() }
+                        ForEach(availableLocales, id: \.identifier) { locale in
+                            Button(displayName(for: locale.identifier)) {
+                                settings.speechLanguage = locale.identifier
                             }
                         }
-                    } else {
-                        PickerPill(text: currentLabel) {
-                            Button("Auto Detect") { settings.speechLanguage = "auto" }
-                            if !availableLocales.isEmpty { Divider() }
-                            ForEach(availableLocales, id: \.identifier) { locale in
-                                Button(displayName(for: locale.identifier)) {
-                                    settings.speechLanguage = locale.identifier
-                                }
-                            }
+                    } label: {
+                        HStack(spacing: DS.Space.tight) {
+                            Text(currentLabel).font(DS.Font.value).foregroundStyle(DS.Color.textTertiary)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(DS.Color.textSecondary)
                         }
-                        .disabled(settings.engine == .parakeet)
                     }
-                    if settings.speechLanguage != "auto", settings.engine != .parakeet {
-                        ResetButton { settings.speechLanguage = "auto" }
-                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                }
+                if settings.speechLanguage != "auto", settings.engine != .parakeet {
+                    ResetButton { settings.speechLanguage = "auto" }
                 }
             }
-
-            CardDivider()
-
-            DictationRow(
-                title: "Translate to English",
-                subtitle: settings.speechLanguage == "auto"
-                    ? "Pick a specific language above first — translation needs to know the source."
-                    : "Runs the transcript through on-device translation before it's typed."
-            ) {
-                Toggle("", isOn: $settings.translateToEnglish)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .disabled(settings.speechLanguage == "auto")
-            }
         }
-        .background(BrushedPanel())
+        CardDivider()
+
+        ToggleRow(title: "Translate to English", isOn: $settings.translateToEnglish)
+            .disabled(settings.speechLanguage == "auto")
+            .opacity(settings.speechLanguage == "auto" ? 0.5 : 1)
         .task {
             let locales = await SpeechTranscriber.supportedLocales
             availableLocales = locales.sorted { displayName(for: $0.identifier) < displayName(for: $1.identifier) }
@@ -370,9 +233,9 @@ private struct SpeechRecognitionCard: View {
     }
 }
 
-// MARK: - Audio card
+// MARK: - Audio
 
-private struct AudioSettingsCard: View {
+private struct AudioSection: View {
     @Bindable var settings: Settings
     @State private var availableMicrophones: [MicrophoneDevice] = []
 
@@ -384,55 +247,127 @@ private struct AudioSettingsCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Silkscreen(text: "Audio", large: true)
-                .padding(.horizontal, DS.Space.roomy)
-                .padding(.top, DS.Space.roomy)
-                .padding(.bottom, DS.Space.base)
+        SectionHeader(title: "Audio")
 
-            DictationRow(
-                title: "Microphone",
-                subtitle: "Select your preferred microphone device."
-            ) {
-                HStack(spacing: DS.Space.snug) {
-                    PickerPill(text: currentMicName) {
-                        Button("Default") { settings.microphoneDeviceID = nil }
-                        if !availableMicrophones.isEmpty { Divider() }
-                        ForEach(availableMicrophones) { device in
-                            Button(device.name) { settings.microphoneDeviceID = device.id }
-                        }
+        SettingsRow(title: "Microphone") {
+            HStack(spacing: DS.Space.snug) {
+                Menu {
+                    Button("Default") { settings.microphoneDeviceID = nil }
+                    if !availableMicrophones.isEmpty { Divider() }
+                    ForEach(availableMicrophones) { device in
+                        Button(device.name) { settings.microphoneDeviceID = device.id }
                     }
-                    if settings.microphoneDeviceID != nil {
-                        ResetButton { settings.microphoneDeviceID = nil }
+                } label: {
+                    HStack(spacing: DS.Space.tight) {
+                        Text(currentMicName).font(DS.Font.value).foregroundStyle(DS.Color.textTertiary)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(DS.Color.textSecondary)
                     }
                 }
-            }
-
-            CardDivider()
-
-            DictationRow(
-                title: "Mute While Recording",
-                subtitle: "Mute system audio during recording, so it isn't picked up."
-            ) {
-                Toggle("", isOn: $settings.muteWhileRecording)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-            }
-
-            CardDivider()
-
-            DictationRow(
-                title: "Audio Feedback",
-                subtitle: "Play a sound when recording starts and stops."
-            ) {
-                Toggle("", isOn: $settings.soundEnabled)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                if settings.microphoneDeviceID != nil {
+                    ResetButton { settings.microphoneDeviceID = nil }
+                }
             }
         }
-        .background(BrushedPanel())
-        .task {
-            availableMicrophones = MicrophoneDevices.available()
+        CardDivider()
+
+        ToggleRow(title: "Mute While Recording", isOn: $settings.muteWhileRecording)
+        CardDivider()
+
+        ToggleRow(title: "Audio Feedback", isOn: $settings.soundEnabled)
+            .task { availableMicrophones = MicrophoneDevices.available() }
+    }
+}
+
+// MARK: - Model
+
+private struct ModelSection: View {
+    @Bindable var settings: Settings
+
+    var body: some View {
+        SectionHeader(title: "Model")
+
+        SettingsRow(title: "Speech Engine") {
+            Menu {
+                ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
+                    Button(choice.displayName) { settings.engine = choice }
+                }
+            } label: {
+                HStack(spacing: DS.Space.tight) {
+                    Text(settings.engine.displayName).font(DS.Font.value).foregroundStyle(DS.Color.textTertiary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(DS.Color.textSecondary)
+                }
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
         }
+        CardDivider()
+
+        HStack {
+            Text(modelNote(settings.engine))
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.Space.base)
+        .padding(.vertical, DS.Space.base)
+    }
+
+    private func modelNote(_ choice: SpeechEngineChoice) -> String {
+        switch choice {
+        case .apple: "Apple's on-device transcriber. Streams text while you speak; no download."
+        case .parakeet: "Parakeet on the Neural Engine. Resolves on release; ~470 MB model."
+        case .cohere: "Cohere Transcribe. Covers Arabic and 13 other languages Apple and Parakeet don't. Resolves on release."
+        }
+    }
+}
+
+// MARK: - Cleanup
+
+private struct CleanupSection: View {
+    @Bindable var settings: Settings
+
+    var body: some View {
+        SectionHeader(title: "Cleanup")
+
+        ToggleRow(title: "Clean Up Transcripts", isOn: $settings.cleanupEnabled)
+
+        HStack {
+            Text("Strips fillers, fixes spacing and punctuation. The dictionary's corrections run either way.")
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.Space.base)
+        .padding(.vertical, DS.Space.base)
+    }
+}
+
+// MARK: - Small shared pieces
+
+private struct CardDivider: View {
+    var body: some View {
+        Rectangle().fill(DS.Color.divider).frame(height: DS.Border.hairline)
+    }
+}
+
+private struct ResetButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(DS.Color.textSecondary)
+        }
+        .buttonStyle(.plain)
+        .help("Reset to default")
     }
 }
