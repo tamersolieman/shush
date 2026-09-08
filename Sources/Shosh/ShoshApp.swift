@@ -184,17 +184,8 @@ private struct MenuContent: View {
 
         Divider()
 
-        Picker("Push-to-talk key", selection: Binding(
-            get: { settings.pushToTalkKey },
-            set: { key in
-                settings.pushToTalkKey = key
-                controller.reloadHotkey()
-            }
-        )) {
-            ForEach(PushToTalkKey.allCases, id: \.self) { key in
-                Text(key.displayName).tag(key)
-            }
-        }
+        Text("Push-to-talk key: \(settings.pushToTalkKey.displayName)")
+            .foregroundStyle(.secondary)
 
         Toggle("Compare mode (both engines)", isOn: $settings.compareMode)
 

@@ -23,7 +23,10 @@ final class Settings {
     static let shared = Settings()
 
     var pushToTalkKey: PushToTalkKey {
-        didSet { defaults.set(pushToTalkKey.rawValue, forKey: Keys.pushToTalkKey) }
+        didSet {
+            guard let data = try? JSONEncoder().encode(pushToTalkKey) else { return }
+            defaults.set(data, forKey: Keys.pushToTalkKey)
+        }
     }
 
     /// On: hold the transcribe key to record, release to stop (the default). Off: press
@@ -71,8 +74,12 @@ final class Settings {
     }
 
     private init() {
-        let raw = defaults.string(forKey: Keys.pushToTalkKey) ?? PushToTalkKey.rightOption.rawValue
-        pushToTalkKey = PushToTalkKey(rawValue: raw) ?? .rightOption
+        if let data = defaults.data(forKey: Keys.pushToTalkKey),
+           let decoded = try? JSONDecoder().decode(PushToTalkKey.self, from: data) {
+            pushToTalkKey = decoded
+        } else {
+            pushToTalkKey = .default
+        }
         pushToTalkEnabled = defaults.object(forKey: Keys.pushToTalkEnabled) as? Bool ?? true
         // Apple by default: no download, no dependency, live text while speaking.
         engine = SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "") ?? .apple

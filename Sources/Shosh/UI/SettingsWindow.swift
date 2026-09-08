@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import SwiftUI
 
 /// Settings — hotkey and model, per the brief. Opens on ⌘, via the standard `Settings` scene,
@@ -83,6 +84,9 @@ private struct DictationCard: View {
     @Bindable var controller: DictationController
     @Bindable var settings: Settings
 
+    @State private var recorder = KeyRecorder()
+    @State private var isRecording = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Silkscreen(text: "Dictation", large: true)
@@ -92,15 +96,20 @@ private struct DictationCard: View {
 
             DictationRow(
                 title: "Transcribe Shortcut",
-                subtitle: "The keyboard shortcut to record and transcribe your voice."
+                subtitle: isRecording
+                    ? "Press any key or modifier — Escape cancels without changing it."
+                    : "The keyboard shortcut to record and transcribe your voice."
             ) {
                 HStack(spacing: DS.Space.snug) {
-                    ShortcutPill(text: settings.pushToTalkKey.displayName) {
-                        cycleKey()
+                    ShortcutPill(
+                        text: isRecording ? "Press any key…" : settings.pushToTalkKey.displayName,
+                        isActive: isRecording
+                    ) {
+                        beginRecording()
                     }
-                    if settings.pushToTalkKey != .rightOption {
+                    if !isRecording, settings.pushToTalkKey != .default {
                         ResetButton {
-                            settings.pushToTalkKey = .rightOption
+                            settings.pushToTalkKey = .default
                             controller.reloadHotkey()
                         }
                     }
@@ -138,13 +147,16 @@ private struct DictationCard: View {
             .padding(.leading, DS.Space.roomy)
     }
 
-    /// Cycles through the three available keys — there's no arbitrary-key recorder here,
-    /// so the pill itself is the picker.
-    private func cycleKey() {
-        let all = PushToTalkKey.allCases
-        let index = all.firstIndex(of: settings.pushToTalkKey) ?? 0
-        settings.pushToTalkKey = all[(index + 1) % all.count]
-        controller.reloadHotkey()
+    private func beginRecording() {
+        isRecording = true
+        recorder.start { captured in
+            isRecording = false
+            // Escape is the universal "never mind" key — capturing it reassigns nothing,
+            // it just backs out of recording.
+            guard captured.keyCode != Int64(kVK_Escape) else { return }
+            settings.pushToTalkKey = captured
+            controller.reloadHotkey()
+        }
     }
 }
 
@@ -172,23 +184,25 @@ private struct DictationRow<Control: View>: View {
     }
 }
 
-/// A shortcut-recorder-style pill: rounded, bordered, the key name centered.
+/// A shortcut-recorder-style pill: rounded, bordered, the key name centered. `isActive`
+/// draws it with the selection edge color while it's listening for a key.
 private struct ShortcutPill: View {
     let text: String
+    var isActive = false
     var isStatic = false
-    let action: () -> Void
+    var action: () -> Void = {}
 
     var body: some View {
         Button(action: action) {
             Text(text)
                 .font(DS.Font.bodyEmphasis)
-                .foregroundStyle(DS.Color.ink)
+                .foregroundStyle(isActive ? DS.Color.selectionEdge : DS.Color.ink)
                 .padding(.horizontal, DS.Space.base)
                 .padding(.vertical, DS.Space.tight)
                 .frame(minWidth: 44)
                 .overlay(
                     RoundedRectangle(cornerRadius: DS.Radius.control)
-                        .strokeBorder(DS.Color.panelShade, lineWidth: DS.Border.hairline)
+                        .strokeBorder(isActive ? DS.Color.selectionEdge : DS.Color.panelShade, lineWidth: DS.Border.hairline)
                 )
         }
         .buttonStyle(.plain)
