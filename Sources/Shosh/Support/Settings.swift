@@ -26,6 +26,13 @@ final class Settings {
         didSet { defaults.set(pushToTalkKey.rawValue, forKey: Keys.pushToTalkKey) }
     }
 
+    /// On: hold the transcribe key to record, release to stop (the default). Off: press
+    /// once to start, press again to stop — the key's release is ignored either way, so
+    /// switching this doesn't need a different key.
+    var pushToTalkEnabled: Bool {
+        didSet { defaults.set(pushToTalkEnabled, forKey: Keys.pushToTalkEnabled) }
+    }
+
     var engine: SpeechEngineChoice {
         didSet { defaults.set(engine.rawValue, forKey: Keys.engine) }
     }
@@ -55,6 +62,7 @@ final class Settings {
 
     private enum Keys {
         static let pushToTalkKey = "pushToTalkKey"
+        static let pushToTalkEnabled = "pushToTalkEnabled"
         static let cleanupEnabled = "cleanupEnabled"
         static let soundEnabled = "soundEnabled"
         static let engine = "engine"
@@ -65,6 +73,7 @@ final class Settings {
     private init() {
         let raw = defaults.string(forKey: Keys.pushToTalkKey) ?? PushToTalkKey.rightOption.rawValue
         pushToTalkKey = PushToTalkKey(rawValue: raw) ?? .rightOption
+        pushToTalkEnabled = defaults.object(forKey: Keys.pushToTalkEnabled) as? Bool ?? true
         // Apple by default: no download, no dependency, live text while speaking.
         engine = SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "") ?? .apple
         cleanupEnabled = defaults.object(forKey: Keys.cleanupEnabled) as? Bool ?? true

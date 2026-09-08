@@ -11,28 +11,7 @@ struct SettingsWindow: View {
             DS.Color.chassis.ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: DS.Space.wide) {
-                panel(label: "Push to talk") {
-                    HStack(spacing: DS.Space.snug) {
-                        ForEach(PushToTalkKey.allCases, id: \.self) { key in
-                            TransportKey(
-                                title: key.displayName,
-                                isEngaged: settings.pushToTalkKey == key,
-                                engagedColor: DS.Color.ink
-                            ) {
-                                settings.pushToTalkKey = key
-                                controller.reloadHotkey()
-                            }
-                            .background {
-                                if settings.pushToTalkKey == key {
-                                    RoundedRectangle(cornerRadius: DS.Radius.control)
-                                        .fill(DS.Color.selection)
-                                }
-                            }
-                        }
-                    }
-                    note("Hold this key anywhere to dictate. The window's Record button works "
-                        + "regardless of what's focused.")
-                }
+                DictationCard(controller: controller, settings: settings)
 
                 panel(label: "Model") {
                     HStack(spacing: DS.Space.snug) {
@@ -91,5 +70,142 @@ struct SettingsWindow: View {
             .font(DS.Font.label)
             .foregroundStyle(DS.Color.inkSecondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+// MARK: - Dictation card
+
+/// A grouped settings card in the style of a shortcut-recorder panel: a section label, then
+/// rows — title and subtitle on the left, a single control on the right — divided by
+/// hairlines. Always the dark "deck" surface regardless of app appearance, the way a
+/// dedicated settings pane reads as its own instrument rather than more panel.
+private struct DictationCard: View {
+    @Bindable var controller: DictationController
+    @Bindable var settings: Settings
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Silkscreen(text: "Dictation", color: DS.Color.inkOnDeck.opacity(0.5))
+                .padding(.horizontal, DS.Space.roomy)
+                .padding(.top, DS.Space.roomy)
+                .padding(.bottom, DS.Space.base)
+
+            DictationRow(
+                title: "Transcribe Shortcut",
+                subtitle: "The keyboard shortcut to record and transcribe your voice."
+            ) {
+                HStack(spacing: DS.Space.snug) {
+                    ShortcutPill(text: settings.pushToTalkKey.displayName) {
+                        cycleKey()
+                    }
+                    if settings.pushToTalkKey != .rightOption {
+                        ResetButton {
+                            settings.pushToTalkKey = .rightOption
+                            controller.reloadHotkey()
+                        }
+                    }
+                }
+            }
+
+            divider
+
+            DictationRow(
+                title: "Push To Talk",
+                subtitle: "Hold to record, release to stop"
+            ) {
+                Toggle("", isOn: $settings.pushToTalkEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+
+            divider
+
+            DictationRow(
+                title: "Cancel Shortcut",
+                subtitle: "The keyboard shortcut to cancel the current recording."
+            ) {
+                ShortcutPill(text: "Escape", isStatic: true) {}
+            }
+        }
+        .background(DeckWindow { Color.clear })
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(DS.Color.seam)
+            .frame(height: DS.Border.hairline)
+            .opacity(0.5)
+            .padding(.leading, DS.Space.roomy)
+    }
+
+    /// Cycles through the three available keys — there's no arbitrary-key recorder here,
+    /// so the pill itself is the picker.
+    private func cycleKey() {
+        let all = PushToTalkKey.allCases
+        let index = all.firstIndex(of: settings.pushToTalkKey) ?? 0
+        settings.pushToTalkKey = all[(index + 1) % all.count]
+        controller.reloadHotkey()
+    }
+}
+
+private struct DictationRow<Control: View>: View {
+    let title: String
+    let subtitle: String
+    @ViewBuilder let control: Control
+
+    var body: some View {
+        HStack(alignment: .center, spacing: DS.Space.roomy) {
+            VStack(alignment: .leading, spacing: DS.Space.hair) {
+                Text(title)
+                    .font(DS.Font.bodyEmphasis)
+                    .foregroundStyle(DS.Color.inkOnDeck)
+                Text(subtitle)
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.Color.inkOnDeck.opacity(0.5))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: DS.Space.roomy)
+            control
+        }
+        .padding(.horizontal, DS.Space.roomy)
+        .padding(.vertical, DS.Space.base)
+    }
+}
+
+/// A shortcut-recorder-style pill: rounded, bordered, the key name centered.
+private struct ShortcutPill: View {
+    let text: String
+    var isStatic = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(text)
+                .font(DS.Font.bodyEmphasis)
+                .foregroundStyle(DS.Color.inkOnDeck)
+                .padding(.horizontal, DS.Space.base)
+                .padding(.vertical, DS.Space.tight)
+                .frame(minWidth: 44)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.Radius.control)
+                        .strokeBorder(DS.Color.inkOnDeck.opacity(0.3), lineWidth: DS.Border.hairline)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(isStatic)
+    }
+}
+
+private struct ResetButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(DS.Color.inkOnDeck.opacity(0.5))
+        }
+        .buttonStyle(.plain)
+        .help("Reset to default")
     }
 }

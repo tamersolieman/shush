@@ -47,6 +47,9 @@ final class DictationController {
 
     private let hotkey = HotkeyMonitor()
     private let capture = AudioCapture()
+    /// Escape, watched only while a recording is active — a passive observer, so it never
+    /// swallows Escape presses that belong to whatever app has focus.
+    private var cancelMonitor: Any?
     private let makeEngine: @Sendable () -> any TranscriptionEngine
 
     /// Injected only by tests; production reads the setting per-utterance below.
@@ -89,14 +92,51 @@ final class DictationController {
     @discardableResult
     func activate() -> Bool {
         hotkey.key = Settings.shared.pushToTalkKey
-        hotkey.onPress = { [weak self] in self?.beginDictation() }
-        hotkey.onRelease = { [weak self] in self?.endDictation() }
+        // In toggle mode the key's release is ignored entirely — press starts or stops
+        // depending on current state, so a stray release (e.g. the tap losing the key
+        // briefly) can't stop a recording the user meant to keep going.
+        hotkey.onPress = { [weak self] in
+            guard let self else { return }
+            if Settings.shared.pushToTalkEnabled {
+                self.beginDictation()
+            } else if self.state.isActive {
+                self.endDictation()
+            } else {
+                self.beginDictation()
+            }
+        }
+        hotkey.onRelease = { [weak self] in
+            guard let self, Settings.shared.pushToTalkEnabled else { return }
+            self.endDictation()
+        }
+        installCancelMonitor()
         return hotkey.start()
     }
 
     func deactivate() {
         hotkey.stop()
+        removeCancelMonitor()
         cancelDictation()
+    }
+
+    /// Cancels the in-progress recording — discards the audio, injects nothing. Wired to
+    /// Escape while a recording is active.
+    func cancelCurrentRecording() {
+        guard state.isActive else { return }
+        cancelDictation()
+    }
+
+    private func installCancelMonitor() {
+        guard cancelMonitor == nil else { return }
+        cancelMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 /* Escape */ else { return }
+            Task { @MainActor in self?.cancelCurrentRecording() }
+        }
+    }
+
+    private func removeCancelMonitor() {
+        if let cancelMonitor { NSEvent.removeMonitor(cancelMonitor) }
+        cancelMonitor = nil
     }
 
     /// Re-arms the tap after the user picks a different push-to-talk key.
