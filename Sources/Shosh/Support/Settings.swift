@@ -61,6 +61,32 @@ final class Settings {
         didSet { defaults.set(soundEnabled, forKey: Keys.soundEnabled) }
     }
 
+    /// A BCP-47 identifier ("en-US", "es-ES", …), or "auto" for the system's current
+    /// locale. Only `AppleSpeechEngine` honors this — Parakeet is English-only.
+    var speechLanguage: String {
+        didSet { defaults.set(speechLanguage, forKey: Keys.speechLanguage) }
+    }
+
+    /// Runs the transcript through on-device translation before injection. Only takes
+    /// effect with a specific `speechLanguage` selected — translation needs a known source
+    /// language, so it's a no-op while `speechLanguage` is "auto".
+    var translateToEnglish: Bool {
+        didSet { defaults.set(translateToEnglish, forKey: Keys.translateToEnglish) }
+    }
+
+    /// CoreAudio device UID of the chosen input, or nil for whatever macOS considers the
+    /// default input device.
+    var microphoneDeviceID: String? {
+        didSet { defaults.set(microphoneDeviceID, forKey: Keys.microphoneDeviceID) }
+    }
+
+    /// Mutes the default output device for the duration of a recording, so the mic doesn't
+    /// pick up whatever's playing. Restored the moment the recording ends, regardless of
+    /// whether this is still on by then.
+    var muteWhileRecording: Bool {
+        didSet { defaults.set(muteWhileRecording, forKey: Keys.muteWhileRecording) }
+    }
+
     private let defaults = UserDefaults.standard
 
     private enum Keys {
@@ -71,6 +97,10 @@ final class Settings {
         static let engine = "engine"
         static let smartCleanup = "smartCleanup"
         static let compareMode = "compareMode"
+        static let speechLanguage = "speechLanguage"
+        static let translateToEnglish = "translateToEnglish"
+        static let microphoneDeviceID = "microphoneDeviceID"
+        static let muteWhileRecording = "muteWhileRecording"
     }
 
     private init() {
@@ -87,5 +117,9 @@ final class Settings {
         smartCleanup = defaults.object(forKey: Keys.smartCleanup) as? Bool ?? false
         compareMode = defaults.object(forKey: Keys.compareMode) as? Bool ?? false
         soundEnabled = defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true
+        speechLanguage = defaults.string(forKey: Keys.speechLanguage) ?? "auto"
+        translateToEnglish = defaults.object(forKey: Keys.translateToEnglish) as? Bool ?? false
+        microphoneDeviceID = defaults.string(forKey: Keys.microphoneDeviceID)
+        muteWhileRecording = defaults.object(forKey: Keys.muteWhileRecording) as? Bool ?? false
     }
 }

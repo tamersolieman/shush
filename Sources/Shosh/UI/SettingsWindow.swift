@@ -1,4 +1,5 @@
 import Carbon.HIToolbox
+import Speech
 import SwiftUI
 
 /// Settings — hotkey and model, per the brief. Opens on ⌘, via the standard `Settings` scene,
@@ -11,8 +12,11 @@ struct SettingsWindow: View {
         ZStack {
             DS.Color.chassis.ignoresSafeArea()
 
+            ScrollView {
             VStack(alignment: .leading, spacing: DS.Space.wide) {
                 DictationCard(controller: controller, settings: settings)
+                SpeechRecognitionCard(settings: settings)
+                AudioSettingsCard(settings: settings)
 
                 panel(label: "Model") {
                     HStack(spacing: DS.Space.snug) {
@@ -46,11 +50,11 @@ struct SettingsWindow: View {
                         + "corrections run either way.")
                 }
 
-                Spacer()
             }
             .padding(DS.Space.panel)
+            }
         }
-        .frame(width: 520, height: 460)
+        .frame(width: 520, height: 640)
     }
 
     private func panel<Content: View>(
@@ -221,5 +225,177 @@ private struct ResetButton: View {
         }
         .buttonStyle(.plain)
         .help("Reset to default")
+    }
+}
+
+private struct CardDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(DS.Color.seam)
+            .frame(height: DS.Border.hairline)
+            .opacity(0.5)
+            .padding(.leading, DS.Space.roomy)
+    }
+}
+
+/// A dropdown, styled like `ShortcutPill` — bordered, rounded, a chevron in place of an
+/// active-recording state.
+private struct PickerPill<MenuItems: View>: View {
+    let text: String
+    @ViewBuilder var menuItems: MenuItems
+
+    var body: some View {
+        Menu {
+            menuItems
+        } label: {
+            HStack(spacing: DS.Space.tight) {
+                Text(text)
+                    .font(DS.Font.bodyEmphasis)
+                    .foregroundStyle(DS.Color.ink)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(DS.Color.inkSecondary)
+            }
+            .padding(.horizontal, DS.Space.base)
+            .padding(.vertical, DS.Space.tight)
+            .overlay(
+                RoundedRectangle(cornerRadius: DS.Radius.control)
+                    .strokeBorder(DS.Color.panelShade, lineWidth: DS.Border.hairline)
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+}
+
+// MARK: - Speech recognition card
+
+private struct SpeechRecognitionCard: View {
+    @Bindable var settings: Settings
+    @State private var availableLocales: [Locale] = []
+
+    private var currentLabel: String {
+        settings.speechLanguage == "auto" ? "Auto Detect" : displayName(for: settings.speechLanguage)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Silkscreen(text: "Speech Recognition", large: true)
+                .padding(.horizontal, DS.Space.roomy)
+                .padding(.top, DS.Space.roomy)
+                .padding(.bottom, DS.Space.base)
+
+            DictationRow(
+                title: "Language",
+                subtitle: settings.engine == .apple
+                    ? "Which language the recognizer listens for. Auto follows your Mac's language."
+                    : "Parakeet is English-only — this only affects the Apple engine."
+            ) {
+                HStack(spacing: DS.Space.snug) {
+                    PickerPill(text: currentLabel) {
+                        Button("Auto Detect") { settings.speechLanguage = "auto" }
+                        if !availableLocales.isEmpty { Divider() }
+                        ForEach(availableLocales, id: \.identifier) { locale in
+                            Button(displayName(for: locale.identifier)) {
+                                settings.speechLanguage = locale.identifier
+                            }
+                        }
+                    }
+                    if settings.speechLanguage != "auto" {
+                        ResetButton { settings.speechLanguage = "auto" }
+                    }
+                }
+            }
+
+            CardDivider()
+
+            DictationRow(
+                title: "Translate to English",
+                subtitle: settings.speechLanguage == "auto"
+                    ? "Pick a specific language above first — translation needs to know the source."
+                    : "Runs the transcript through on-device translation before it's typed."
+            ) {
+                Toggle("", isOn: $settings.translateToEnglish)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .disabled(settings.speechLanguage == "auto")
+            }
+        }
+        .background(BrushedPanel())
+        .task {
+            let locales = await SpeechTranscriber.supportedLocales
+            availableLocales = locales.sorted { displayName(for: $0.identifier) < displayName(for: $1.identifier) }
+        }
+    }
+
+    private func displayName(for identifier: String) -> String {
+        Locale.current.localizedString(forIdentifier: identifier)?.capitalized ?? identifier
+    }
+}
+
+// MARK: - Audio card
+
+private struct AudioSettingsCard: View {
+    @Bindable var settings: Settings
+    @State private var availableMicrophones: [MicrophoneDevice] = []
+
+    private var currentMicName: String {
+        guard let id = settings.microphoneDeviceID,
+              let device = availableMicrophones.first(where: { $0.id == id })
+        else { return "Default" }
+        return device.name
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Silkscreen(text: "Audio", large: true)
+                .padding(.horizontal, DS.Space.roomy)
+                .padding(.top, DS.Space.roomy)
+                .padding(.bottom, DS.Space.base)
+
+            DictationRow(
+                title: "Microphone",
+                subtitle: "Select your preferred microphone device."
+            ) {
+                HStack(spacing: DS.Space.snug) {
+                    PickerPill(text: currentMicName) {
+                        Button("Default") { settings.microphoneDeviceID = nil }
+                        if !availableMicrophones.isEmpty { Divider() }
+                        ForEach(availableMicrophones) { device in
+                            Button(device.name) { settings.microphoneDeviceID = device.id }
+                        }
+                    }
+                    if settings.microphoneDeviceID != nil {
+                        ResetButton { settings.microphoneDeviceID = nil }
+                    }
+                }
+            }
+
+            CardDivider()
+
+            DictationRow(
+                title: "Mute While Recording",
+                subtitle: "Mute system audio during recording, so it isn't picked up."
+            ) {
+                Toggle("", isOn: $settings.muteWhileRecording)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+
+            CardDivider()
+
+            DictationRow(
+                title: "Audio Feedback",
+                subtitle: "Play a sound when recording starts and stops."
+            ) {
+                Toggle("", isOn: $settings.soundEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+        }
+        .background(BrushedPanel())
+        .task {
+            availableMicrophones = MicrophoneDevices.available()
+        }
     }
 }

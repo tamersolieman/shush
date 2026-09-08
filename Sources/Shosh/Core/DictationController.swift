@@ -15,8 +15,11 @@ func engineForCurrentSetting() -> any TranscriptionEngine {
     // Always invoked from `beginDictation`, which runs on the main actor.
     MainActor.assumeIsolated {
         switch Settings.shared.engine {
-        case .apple: AppleSpeechEngine()
-        case .parakeet: ParakeetEngine()
+        case .apple:
+            let language = Settings.shared.speechLanguage
+            return AppleSpeechEngine(locale: language == "auto" ? Locale.current : Locale(identifier: language))
+        case .parakeet:
+            return ParakeetEngine()
         }
     }
 }
@@ -77,6 +80,11 @@ final class DictationController {
     /// Compare mode only: the recording, kept so every engine sees identical audio.
     private var recorded: [AudioChunk] = []
     private var isComparing = false
+
+    /// Whether this hold actually muted the output — only true if `muteWhileRecording` was
+    /// on *and* the mute call succeeded, so `endDictation`/`cancelDictation` know whether
+    /// there's anything to restore.
+    private var mutedForRecording = false
 
     init(
         formatter: (any TextFormatter)? = nil,
@@ -177,6 +185,10 @@ final class DictationController {
         recorded.removeAll(keepingCapacity: true)
         engineName = isComparing ? "Comparing…" : Settings.shared.engine.displayName
 
+        if Settings.shared.muteWhileRecording {
+            mutedForRecording = SystemAudio.setOutputMuted(true)
+        }
+
         Task { @MainActor in
             do {
                 guard await Permissions.requestMicrophone() else {
@@ -222,8 +234,12 @@ final class DictationController {
                     return recording
                 }
 
+                let microphoneDeviceID = Settings.shared.microphoneDeviceID
+                    .flatMap { MicrophoneDevices.resolve(uid: $0)?.audioDeviceID }
+
                 try capture.start(
                     outputFormat: format,
+                    microphoneDeviceID: microphoneDeviceID,
                     onBuffer: { chunk in
                         audioContinuation.yield(chunk)
                     },
@@ -266,6 +282,7 @@ final class DictationController {
         capture.stop()
         level = 0
         releasedAt = Date()
+        unmuteIfNeeded()
 
         Task { @MainActor in
             // Drain every captured buffer into the engine before asking it to finalize,
@@ -299,9 +316,13 @@ final class DictationController {
             // The dictionary runs last, and runs regardless of the cleanup setting. Biasing
             // only raises the odds of the right word; this is the pass that guarantees it,
             // so it must not be something the user can accidentally switch off.
-            let (output, corrections) = DictionaryStore.shared.corrector.apply(to: cleaned)
+            var (output, corrections) = DictionaryStore.shared.corrector.apply(to: cleaned)
             if !corrections.isEmpty {
                 Log.speech.info("dictionary · \(corrections.count, privacy: .public) correction(s) applied")
+            }
+
+            if Settings.shared.translateToEnglish {
+                output = await Translator.translateToEnglish(output, sourceIdentifier: Settings.shared.speechLanguage)
             }
 
             // Captured right before injection, not at hold-start: the HUD is a
@@ -319,6 +340,7 @@ final class DictationController {
 
     private func cancelDictation() {
         capture.stop()
+        unmuteIfNeeded()
         audioContinuation?.finish()
         audioContinuation = nil
         feedTask?.cancel()
@@ -349,6 +371,12 @@ final class DictationController {
     }
 
     // MARK: - Helpers
+
+    private func unmuteIfNeeded() {
+        guard mutedForRecording else { return }
+        SystemAudio.setOutputMuted(false)
+        mutedForRecording = false
+    }
 
     private func retainForComparison(_ chunk: AudioChunk) {
         guard isComparing else { return }

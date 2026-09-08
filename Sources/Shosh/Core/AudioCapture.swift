@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreAudio
 import Foundation
 
 /// Microphone capture with on-the-fly conversion to whatever format the speech engine wants.
@@ -18,6 +19,7 @@ final class AudioCapture: @unchecked Sendable {
 
     func start(
         outputFormat: AVAudioFormat,
+        microphoneDeviceID: AudioDeviceID? = nil,
         onBuffer: @escaping @Sendable (AudioChunk) -> Void,
         onLevel: @escaping @Sendable (Float) -> Void
     ) throws {
@@ -28,6 +30,15 @@ final class AudioCapture: @unchecked Sendable {
         self.outputFormat = outputFormat
 
         let input = engine.inputNode
+        // Must happen before reading the native format below — switching devices can
+        // change the sample rate the tap sees.
+        if let microphoneDeviceID {
+            do {
+                try input.auAudioUnit.setDeviceID(microphoneDeviceID)
+            } catch {
+                Log.audio.error("couldn't switch to chosen microphone, using default: \(error.localizedDescription)")
+            }
+        }
         let nativeFormat = input.outputFormat(forBus: 0)
 
         converter = nativeFormat == outputFormat
