@@ -137,3 +137,35 @@ private extension NSColor {
         )
     }
 }
+
+/// The waveform brand mark, shared by the sidebar and the menu bar item — replaces the
+/// "Shosh" wordmark and the placeholder SF Symbol respectively.
+struct BrandMark: View {
+    var body: some View {
+        if let url = Bundle.main.url(forResource: "BrandMark", withExtension: "png"),
+           let image = NSImage(contentsOf: url) {
+            Image(nsImage: image).resizable()
+        } else {
+            Image(systemName: "waveform")
+        }
+    }
+}
+
+/// Menu bar glyph — a template image so AppKit tints it to match the light/dark menu bar,
+/// same as any SF Symbol would.
+struct StatusBarIcon: View {
+    private static let image: NSImage? = {
+        guard let url = Bundle.main.url(forResource: "StatusBarIcon", withExtension: "png"),
+              let image = NSImage(contentsOf: url) else { return nil }
+        image.isTemplate = true
+        return image
+    }()
+
+    var body: some View {
+        if let image = Self.image {
+            Image(nsImage: image)
+        } else {
+            Image(systemName: "waveform")
+        }
+    }
+}

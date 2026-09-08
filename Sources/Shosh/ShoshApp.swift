@@ -32,7 +32,8 @@ struct ShoshApp: App {
         MenuBarExtra {
             MenuContent(controller: delegate.controller)
         } label: {
-            Image(systemName: delegate.controller.state.isActive ? "waveform.circle.fill" : "waveform")
+            StatusBarIcon()
+                .opacity(delegate.controller.state.isActive ? 1 : 0.55)
         }
 
         Window("Engine comparison", id: "comparison") {

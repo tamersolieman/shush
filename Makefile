@@ -61,6 +61,8 @@ app: build
 	@cp $(BUILD) "$(CONTENTS)/MacOS/$(EXEC)"
 	@cp Resources/Info.plist "$(CONTENTS)/Info.plist"
 	@if [ -f Resources/AppIcon.icns ]; then cp Resources/AppIcon.icns "$(CONTENTS)/Resources/"; fi
+	@cp Resources/BrandMark.png "$(CONTENTS)/Resources/"
+	@cp Resources/StatusBarIcon.png "$(CONTENTS)/Resources/"
 	@# Tajawal (Tamer Solieman Design System) — loaded via ATSApplicationFontsPath.
 	@mkdir -p "$(CONTENTS)/Resources/Fonts"
 	@cp Resources/Fonts/*.ttf "$(CONTENTS)/Resources/Fonts/"

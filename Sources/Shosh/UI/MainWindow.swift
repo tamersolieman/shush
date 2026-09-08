@@ -52,9 +52,8 @@ private struct Sidebar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.section) {
-            Text("Shosh")
-                .font(DS.Font.logo)
-                .foregroundStyle(DS.Color.primary)
+            BrandMark()
+                .frame(width: 28, height: 28)
 
             VStack(alignment: .leading, spacing: DS.Space.snug) {
                 ForEach(MainWindow.Section.allCases) { candidate in
