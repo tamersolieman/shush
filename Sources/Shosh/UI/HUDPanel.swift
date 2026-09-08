@@ -21,7 +21,11 @@ final class HUDPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         hidesOnDeactivate = false
         isMovableByWindowBackground = false
-        ignoresMouseEvents = true
+        // The HUD carries a close/cancel button now, so it can't be fully click-through
+        // anymore — AppKit has no per-pixel passthrough for a single window. It's small and
+        // only on screen while actively dictating, so this briefly blocking clicks to
+        // whatever's underneath is an acceptable trade for the button working at all.
+        ignoresMouseEvents = false
 
         isOpaque = false
         backgroundColor = .clear

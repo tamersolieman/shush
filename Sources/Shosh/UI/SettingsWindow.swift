@@ -1,3 +1,4 @@
+import AppKit
 import Carbon.HIToolbox
 import FluidAudio
 import Speech
@@ -319,6 +320,7 @@ private struct AudioSection: View {
 
 private struct ModelSection: View {
     @Bindable var settings: Settings
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         SectionHeader(title: "Model")
@@ -343,6 +345,36 @@ private struct ModelSection: View {
 
         HStack {
             Text(modelNote(settings.engine))
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.Space.base)
+        .padding(.vertical, DS.Space.base)
+        CardDivider()
+
+        ToggleRow(title: "Compare Mode (all engines)", isOn: $settings.compareMode)
+        CardDivider()
+
+        SettingsRow(title: "Comparison Window") {
+            Button {
+                RunStore.shared.reload()
+                openWindow(id: "comparison")
+                NSApp.activate(ignoringOtherApps: true)
+            } label: {
+                HStack(spacing: DS.Space.tight) {
+                    Text("Open").font(DS.Font.value).foregroundStyle(DS.Color.textTertiary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(DS.Color.textSecondary)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+
+        HStack {
+            Text("Compare mode records with every engine at once and shows results side by side here — nothing is typed into the focused app while it's on.")
                 .font(DS.Font.meta)
                 .foregroundStyle(DS.Color.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)

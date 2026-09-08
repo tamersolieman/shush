@@ -17,20 +17,26 @@ struct HUDView: View {
     @State private var settings = Settings.shared
 
     var body: some View {
-        HStack(spacing: DS.Space.roomy) {
-            Waveform(level: controller.level, isActive: controller.state == .listening)
-                .frame(width: 84, height: 28)
+        ZStack(alignment: .topTrailing) {
+            HStack(spacing: DS.Space.roomy) {
+                Waveform(level: controller.level, isActive: controller.state == .listening)
+                    .frame(width: 84, height: 28)
 
-            Text(label)
-                .font(DS.Font.medium(14))
-                .foregroundStyle(isError ? DS.Color.danger : DS.Color.textPrimary)
-                .lineLimit(2)
-                .truncationMode(.head)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .animation(.easeOut(duration: 0.12), value: controller.transcript)
+                Text(label)
+                    .font(DS.Font.medium(14))
+                    .foregroundStyle(isError ? DS.Color.danger : DS.Color.textPrimary)
+                    .lineLimit(2)
+                    .truncationMode(.head)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .animation(.easeOut(duration: 0.12), value: controller.transcript)
+            }
+            .padding(.horizontal, DS.Space.section)
+            .padding(.vertical, DS.Space.roomy)
+            .padding(.trailing, DS.Space.wide)
+
+            CloseButton { controller.cancelCurrentRecording() }
+                .padding(8)
         }
-        .padding(.horizontal, DS.Space.section)
-        .padding(.vertical, DS.Space.roomy)
         .frame(width: 420, height: 76)
         .background {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -63,6 +69,26 @@ struct HUDView: View {
         case .error(let message): message
         case .idle: ""
         }
+    }
+}
+
+/// Cancels the recording — discards audio, injects nothing. Adding this meant `HUDPanel`
+/// had to stop ignoring mouse events entirely (AppKit has no per-pixel click-through for a
+/// single window), so the HUD's small footprint now briefly blocks clicks to whatever's
+/// beneath it while it's visible — an acceptable trade for a working cancel button.
+private struct CloseButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(DS.Color.textSecondary)
+                .frame(width: 18, height: 18)
+                .background(DS.Color.surfaceSecondary, in: .circle)
+        }
+        .buttonStyle(.plain)
+        .help("Cancel recording")
     }
 }
 
