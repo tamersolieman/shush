@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 /// Settings — hotkey and model, per the brief. Opens on ⌘, via the standard `Settings` scene,
@@ -67,20 +66,11 @@ struct SettingsWindow: View {
                         + "corrections run either way.")
                 }
 
-                panel(label: "Dashboard") {
-                    TransportKey(title: "Open dashboard", systemImage: "chart.bar") {
-                        NSWorkspace.shared.open(RunLog.dashboardURL)
-                    }
-                    note("Every dictation, side by side across engines — process time, "
-                        + "realtime factor, and the transcript itself. Opens in your browser; "
-                        + "rewritten after each run.")
-                }
-
                 Spacer()
             }
             .padding(DS.Space.panel)
         }
-        .frame(width: 520, height: 560)
+        .frame(width: 520, height: 460)
     }
 
     private func panel<Content: View>(

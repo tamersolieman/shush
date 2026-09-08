@@ -16,9 +16,16 @@ struct MainWindow: View {
     enum Section: String, CaseIterable, Identifiable {
         case transcriptions
         case dictionary
+        case dashboard
 
         var id: String { rawValue }
-        var title: String { self == .transcriptions ? "Transcriptions" : "Dictionary" }
+        var title: String {
+            switch self {
+            case .transcriptions: "Transcriptions"
+            case .dictionary: "Dictionary"
+            case .dashboard: "Dashboard"
+            }
+        }
     }
 
     var body: some View {
@@ -35,6 +42,7 @@ struct MainWindow: View {
                         switch section {
                         case .transcriptions: TranscriptionList()
                         case .dictionary: DictionaryPanel()
+                        case .dashboard: ComparisonWindow(controller: controller)
                         }
                     }
                     .padding(DS.Space.hair)
