@@ -38,7 +38,7 @@ struct ComparisonWindow: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: DS.Space.section) {
                 header
                 recordBar
 
@@ -53,29 +53,38 @@ struct ComparisonWindow: View {
                     }
                 }
             }
-            .padding(22)
+            .padding(DS.Space.panel)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(minWidth: 560, minHeight: 420)
-        .background(.background)
+        .background(DS.Color.background)
+        .preferredColorScheme(settings.appearance.colorScheme)
     }
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: DS.Space.hair) {
                 Text("Engine comparison")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundStyle(Brand.gradient)
+                    .font(DS.Font.bold(22))
+                    .foregroundStyle(DS.Color.primary)
                 Text("\(store.runs.count) recording\(store.runs.count == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DS.Font.meta)
+                    .foregroundStyle(DS.Color.textTertiary)
             }
             Spacer()
             if !store.runs.isEmpty {
-                Button("Clear") {
+                Button {
                     RunLog.clear()
                     store.reload()
+                } label: {
+                    Text("Clear")
+                        .font(DS.Font.button)
+                        .foregroundStyle(DS.Color.textSecondary)
+                        .padding(.horizontal, DS.Space.roomy)
+                        .frame(height: 30)
+                        .background(DS.Color.surfaceSecondary, in: .rect(cornerRadius: DS.Radius.control))
                 }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -85,33 +94,31 @@ struct ComparisonWindow: View {
     private var recordBar: some View {
         let isRecording = controller.state.isActive
 
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Button {
-                    if isRecording {
-                        controller.stopButtonRecording()
-                    } else {
-                        controller.startButtonRecording()
-                    }
-                } label: {
-                    Label(
-                        isRecording ? "Stop" : "Record all three",
-                        systemImage: isRecording ? "stop.circle.fill" : "record.circle"
-                    )
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+        return VStack(alignment: .leading, spacing: DS.Space.snug) {
+            Button {
+                if isRecording {
+                    controller.stopButtonRecording()
+                } else {
+                    controller.startButtonRecording()
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(isRecording ? .red : .accentColor)
-                .controlSize(.large)
+            } label: {
+                HStack(spacing: DS.Space.snug) {
+                    Image(systemName: isRecording ? "stop.circle.fill" : "record.circle")
+                    Text(isRecording ? "Stop" : "Record all three")
+                        .font(DS.Font.semibold(15))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(isRecording ? DS.Color.danger : DS.Color.primary, in: .rect(cornerRadius: DS.Radius.pill))
             }
+            .buttonStyle(.plain)
 
             Text(statusLine(isRecording: isRecording))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
         }
-        .padding(.bottom, 4)
+        .padding(.bottom, DS.Space.tight)
     }
 
     private func statusLine(isRecording: Bool) -> String {
@@ -123,21 +130,22 @@ struct ComparisonWindow: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 9) {
+        VStack(spacing: DS.Space.base) {
             Image(systemName: "waveform")
                 .font(.system(size: 30))
-                .foregroundStyle(Brand.gradient)
+                .foregroundStyle(DS.Color.primary)
             Text("Hold \(settings.pushToTalkKey.displayName), say a sentence, let go.")
-                .font(.system(size: 15, weight: .semibold))
+                .font(DS.Font.semibold(15))
+                .foregroundStyle(DS.Color.textPrimary)
             Text(settings.compareMode
                  ? "Both engines run on that one recording and appear here."
-                 : "Turn on Compare mode in the menu bar to see both engines at once.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+                 : "Turn on Compare Mode in Settings to see both engines at once.")
+                .font(DS.Font.body)
+                .foregroundStyle(DS.Color.textSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 48)
+        .padding(.vertical, DS.Space.panel + DS.Space.roomy)
     }
 }
 
@@ -167,23 +175,23 @@ private struct ComparisonCard: View {
     /// Case and punctuation are normalized away: Apple auto-punctuates and Parakeet
     /// doesn't, and that's a formatting difference, not a recognition error.
     private var verdict: (String, Color) {
-        if Set(runs.map(\.text)).count == 1 { return ("identical", .green) }
+        if Set(runs.map(\.text)).count == 1 { return ("identical", DS.Color.success) }
         let normalized = Set(runs.map {
             $0.text.lowercased().split { !$0.isLetter && !$0.isNumber }.joined(separator: " ")
         })
-        return normalized.count == 1 ? ("same words", .green) : ("words differ", .purple)
+        return normalized.count == 1 ? ("same words", DS.Color.success) : ("words differ", DS.Color.warning)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DS.Space.base) {
             HStack {
                 Text(runs.first.map { "\($0.date.formatted(date: .omitted, time: .standard)) · held \($0.audioSeconds, format: .number.precision(.fractionLength(1)))s" } ?? "")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DS.Font.meta)
+                    .foregroundStyle(DS.Color.textTertiary)
                 Spacer()
                 Text(verdict.0)
-                    .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 9).padding(.vertical, 3)
+                    .font(DS.Font.meta)
+                    .padding(.horizontal, DS.Space.snug).padding(.vertical, DS.Space.hair)
                     .background(verdict.1.opacity(0.16), in: Capsule())
                     .foregroundStyle(verdict.1)
 
@@ -194,36 +202,36 @@ private struct ComparisonCard: View {
                         withAnimation { RunLog.deleteGroup(group) }
                     } label: {
                         Image(systemName: "trash")
-                            .font(.caption2)
+                            .font(.system(size: 11))
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.textSecondary)
                     .help("Delete this comparison")
                 }
             }
             if let margin {
-                HStack(spacing: 5) {
+                HStack(spacing: DS.Space.hair) {
                     Image(systemName: margin == "tied" ? "equal.circle.fill" : "bolt.fill")
                     Text(margin)
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.green)
+                .font(DS.Font.semibold(12))
+                .foregroundStyle(DS.Color.success)
             } else if runs.count == 1 {
-                HStack(spacing: 5) {
+                HStack(spacing: DS.Space.hair) {
                     ProgressView().controlSize(.small)
                     Text("running second engine…")
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
             }
 
-            Divider()
+            Rectangle().fill(DS.Color.divider).frame(height: DS.Border.hairline)
             ForEach(Array(ranked.enumerated()), id: \.offset) { index, run in
                 EngineRow(run: run, rank: index + 1, showRank: runs.count > 1)
             }
         }
-        .padding(16)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 13))
+        .padding(DS.Space.roomy)
+        .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.card))
     }
 }
 
@@ -235,29 +243,29 @@ private struct EngineRow: View {
     private var isWinner: Bool { showRank && rank == 1 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: DS.Space.tight) {
             HStack(alignment: .firstTextBaseline) {
                 Text(run.engine + (isWinner ? " · fastest" : ""))
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 8).padding(.vertical, 2)
-                    .background((isWinner ? Color.green : Color.accentColor).opacity(0.16), in: Capsule())
-                    .foregroundStyle(isWinner ? .green : Color.accentColor)
+                    .font(DS.Font.semibold(11))
+                    .padding(.horizontal, DS.Space.snug).padding(.vertical, DS.Space.hair)
+                    .background((isWinner ? DS.Color.success : DS.Color.primary).opacity(0.16), in: Capsule())
+                    .foregroundStyle(isWinner ? DS.Color.success : DS.Color.primary)
                 Spacer()
                 Text("\(run.processSeconds, format: .number.precision(.fractionLength(2)))s")
                     .font(.system(size: isWinner ? 20 : 17, weight: .semibold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(isWinner ? .green : .primary)
+                    .foregroundStyle(isWinner ? DS.Color.success : DS.Color.textPrimary)
             }
             Text("\(run.realtimeFactor, format: .number.precision(.fractionLength(0)))× realtime · \(run.characters) chars")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
             Text(run.text.isEmpty ? "(nothing recognized)" : run.text)
-                .font(.callout)
-                .foregroundStyle(run.text.isEmpty ? .secondary : .primary)
+                .font(DS.Font.body)
+                .foregroundStyle(run.text.isEmpty ? DS.Color.textTertiary : DS.Color.textPrimary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, DS.Space.tight)
     }
 }
 
@@ -265,17 +273,20 @@ private struct SingleCard: View {
     let run: DictationRun
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: DS.Space.tight) {
             HStack {
-                Text(run.engine).font(.caption.weight(.semibold))
+                Text(run.engine).font(DS.Font.semibold(12)).foregroundStyle(DS.Color.textPrimary)
                 Spacer()
                 Text("\(run.processSeconds, format: .number.precision(.fractionLength(2)))s")
-                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                    .font(DS.Font.meta).monospacedDigit().foregroundStyle(DS.Color.textTertiary)
             }
-            Text(run.text).font(.callout).textSelection(.enabled)
+            Text(run.text)
+                .font(DS.Font.body)
+                .foregroundStyle(DS.Color.textPrimary)
+                .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(13)
-        .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 10))
+        .padding(DS.Space.roomy)
+        .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.control))
     }
 }
