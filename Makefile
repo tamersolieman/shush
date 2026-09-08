@@ -24,10 +24,17 @@ CONTENTS := $(BUNDLE)/Contents
 
 ## TCC keys the Accessibility grant to the code signature, so an ad-hoc signature — which
 ## changes on every build — makes the user re-grant after every `make`. Signing with a
-## stable Developer ID keeps the identity constant and the grant sticky. Falls back to
-## ad-hoc ("-") on a machine without the cert.
+## stable identity keeps the grant sticky across rebuilds. Prefers a real Developer ID if
+## one's installed, otherwise falls back to the self-signed "Shosh Local Dev" cert this repo
+## sets up for local development (still stable across builds — TCC only needs the signature
+## identity to not change, not to chain to a trusted CA). Falls back to ad-hoc ("-") if
+## neither exists.
 SIGN_ID := $(shell security find-identity -v -p codesigning 2>/dev/null \
              | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)".*/\1/')
+ifeq ($(strip $(SIGN_ID)),)
+SIGN_ID := $(shell security find-identity -v -p codesigning 2>/dev/null \
+             | grep "Shosh Local Dev" | head -1 | sed -E 's/.*"(.*)".*/\1/')
+endif
 ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := -
 endif
