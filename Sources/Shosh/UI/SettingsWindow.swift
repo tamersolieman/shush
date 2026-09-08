@@ -77,15 +77,15 @@ struct SettingsWindow: View {
 
 /// A grouped settings card in the style of a shortcut-recorder panel: a section label, then
 /// rows — title and subtitle on the left, a single control on the right — divided by
-/// hairlines. Always the dark "deck" surface regardless of app appearance, the way a
-/// dedicated settings pane reads as its own instrument rather than more panel.
+/// hairlines. Same panel/ink tokens as the rest of Settings, so it follows the app's own
+/// light/dark face rather than forcing one.
 private struct DictationCard: View {
     @Bindable var controller: DictationController
     @Bindable var settings: Settings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Silkscreen(text: "Dictation", color: DS.Color.inkOnDeck.opacity(0.5))
+            Silkscreen(text: "Dictation", large: true)
                 .padding(.horizontal, DS.Space.roomy)
                 .padding(.top, DS.Space.roomy)
                 .padding(.bottom, DS.Space.base)
@@ -127,7 +127,7 @@ private struct DictationCard: View {
                 ShortcutPill(text: "Escape", isStatic: true) {}
             }
         }
-        .background(DeckWindow { Color.clear })
+        .background(BrushedPanel())
     }
 
     private var divider: some View {
@@ -158,10 +158,10 @@ private struct DictationRow<Control: View>: View {
             VStack(alignment: .leading, spacing: DS.Space.hair) {
                 Text(title)
                     .font(DS.Font.bodyEmphasis)
-                    .foregroundStyle(DS.Color.inkOnDeck)
+                    .foregroundStyle(DS.Color.ink)
                 Text(subtitle)
                     .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.inkOnDeck.opacity(0.5))
+                    .foregroundStyle(DS.Color.inkSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: DS.Space.roomy)
@@ -182,13 +182,13 @@ private struct ShortcutPill: View {
         Button(action: action) {
             Text(text)
                 .font(DS.Font.bodyEmphasis)
-                .foregroundStyle(DS.Color.inkOnDeck)
+                .foregroundStyle(DS.Color.ink)
                 .padding(.horizontal, DS.Space.base)
                 .padding(.vertical, DS.Space.tight)
                 .frame(minWidth: 44)
                 .overlay(
                     RoundedRectangle(cornerRadius: DS.Radius.control)
-                        .strokeBorder(DS.Color.inkOnDeck.opacity(0.3), lineWidth: DS.Border.hairline)
+                        .strokeBorder(DS.Color.panelShade, lineWidth: DS.Border.hairline)
                 )
         }
         .buttonStyle(.plain)
@@ -203,7 +203,7 @@ private struct ResetButton: View {
         Button(action: action) {
             Image(systemName: "arrow.clockwise")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(DS.Color.inkOnDeck.opacity(0.5))
+                .foregroundStyle(DS.Color.inkSecondary)
         }
         .buttonStyle(.plain)
         .help("Reset to default")
