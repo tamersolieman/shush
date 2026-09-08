@@ -13,6 +13,7 @@ struct SettingsPageView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                AppearanceSection(settings: settings)
                 DictationSection(controller: controller, settings: settings)
                 SpeechRecognitionSection(settings: settings)
                 AudioSection(settings: settings)
@@ -29,10 +30,13 @@ struct SettingsPageView: View {
 struct SettingsWindow: View {
     @Bindable var controller: DictationController
 
+    @State private var settings = Settings.shared
+
     var body: some View {
         SettingsPageView(controller: controller)
             .background(DS.Color.background)
             .frame(width: 640, height: 720)
+            .preferredColorScheme(settings.appearance.colorScheme)
     }
 }
 
@@ -104,6 +108,35 @@ private struct ToggleRow: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .tint(DS.Color.primary)
+        }
+    }
+}
+
+// MARK: - Appearance
+
+private struct AppearanceSection: View {
+    @Bindable var settings: Settings
+
+    var body: some View {
+        SectionHeader(title: "Appearance")
+
+        SettingsRow(title: "Theme") {
+            Menu {
+                ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                    Button(mode.displayName) { settings.appearance = mode }
+                }
+            } label: {
+                HStack(spacing: DS.Space.tight) {
+                    Text(settings.appearance.displayName)
+                        .font(DS.Font.value)
+                        .foregroundStyle(DS.Color.textTertiary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(DS.Color.textSecondary)
+                }
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
         }
     }
 }

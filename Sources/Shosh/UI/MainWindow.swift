@@ -8,6 +8,7 @@ import SwiftUI
 /// Settings being a separate window.
 struct MainWindow: View {
     @Bindable var controller: DictationController
+    @State private var settings = Settings.shared
 
     @State private var section: Section = .dashboard
 
@@ -40,6 +41,7 @@ struct MainWindow: View {
         }
         .frame(minWidth: 960, minHeight: 640)
         .background(DS.Color.background)
+        .preferredColorScheme(settings.appearance.colorScheme)
     }
 }
 

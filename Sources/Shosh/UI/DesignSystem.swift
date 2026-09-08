@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The design system for Shosh — a flat sidebar-nav app, from the Pencil design at
@@ -11,26 +12,44 @@ enum DS {
 
     // MARK: - Color
 
+    /// Light/dark pairs straight from the Pencil file's variables (`shosh_app.pen`, themed
+    /// `mode: light/dark` values). Resolved per-appearance via `face(light:dark:)`, so every
+    /// token below tracks whichever appearance the window is actually drawing in —
+    /// including an explicit override from `Settings.appearance` (wired through
+    /// `.preferredColorScheme` at the window root), not just the system setting.
     enum Color {
-        static let background = SwiftUI.Color(hex: 0xFFFFFF)
-        static let surface = SwiftUI.Color(hex: 0xF9FAFB)
-        static let surfaceSecondary = SwiftUI.Color(hex: 0xEFEFEF)
-        static let sidebarBackground = SwiftUI.Color(hex: 0xF3F4F6)
+        static let background = face(light: 0xFFFFFF, dark: 0x0F172A)
+        static let surface = face(light: 0xF9FAFB, dark: 0x1E293B)
+        static let surfaceSecondary = face(light: 0xEFEFEF, dark: 0x334155)
+        static let sidebarBackground = face(light: 0xF3F4F6, dark: 0x1A202C)
 
-        static let textPrimary = SwiftUI.Color(hex: 0x1A1A1A)
-        static let textSecondary = SwiftUI.Color(hex: 0x666666)
-        static let textTertiary = SwiftUI.Color(hex: 0x999999)
+        static let textPrimary = face(light: 0x1A1A1A, dark: 0xF1F5F9)
+        static let textSecondary = face(light: 0x666666, dark: 0xCBD5E1)
+        static let textTertiary = face(light: 0x999999, dark: 0x94A3B8)
 
-        static let border = SwiftUI.Color(hex: 0xE5E5E5)
-        static let divider = SwiftUI.Color(hex: 0xEFEFEF)
+        static let border = face(light: 0xE5E5E5, dark: 0x334155)
+        static let divider = face(light: 0xEFEFEF, dark: 0x334155)
 
-        static let primary = SwiftUI.Color(hex: 0x3B82F6)
-        static let primaryLight = SwiftUI.Color(hex: 0xDBEAFE)
+        static let primary = face(light: 0x3B82F6, dark: 0x60A5FA)
+        /// No dark value in the source file (it's a flat `#DBEAFE`) — a muted dark-blue tint
+        /// keeps the same "selected nav row" role without a pale swatch glaring on a dark
+        /// sidebar.
+        static let primaryLight = face(light: 0xDBEAFE, dark: 0x1E3A5F)
 
-        /// Nominal / positive — used sparingly, e.g. a "fastest" badge.
+        /// Nominal / positive — used sparingly, e.g. a "fastest" badge. Not themed in the
+        /// source file; same in both appearances.
         static let success = SwiftUI.Color(hex: 0x22C55E)
         static let warning = SwiftUI.Color(hex: 0xF59E0B)
         static let danger = SwiftUI.Color(hex: 0xEF4444)
+
+        /// Resolves to the light or dark value for whatever appearance is actually active —
+        /// the window's, not necessarily `NSApp`'s, so `.preferredColorScheme` overrides work.
+        private static func face(light: UInt32, dark: UInt32) -> SwiftUI.Color {
+            SwiftUI.Color(nsColor: NSColor(name: nil) { appearance in
+                let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                return NSColor(hex: isDark ? dark : light)
+            })
+        }
     }
 
     // MARK: - Type
@@ -104,6 +123,17 @@ private extension SwiftUI.Color {
             red: Double((hex >> 16) & 0xFF) / 255,
             green: Double((hex >> 8) & 0xFF) / 255,
             blue: Double(hex & 0xFF) / 255
+        )
+    }
+}
+
+private extension NSColor {
+    convenience init(hex: UInt32) {
+        self.init(
+            srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1
         )
     }
 }

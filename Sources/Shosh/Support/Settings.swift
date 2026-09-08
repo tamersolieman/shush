@@ -1,5 +1,32 @@
 import Foundation
 import Observation
+import SwiftUI
+
+/// Which appearance the app draws in — independent of the system setting, since the Pencil
+/// design ships explicit light/dark values rather than deriving dark from light.
+enum AppearanceMode: String, CaseIterable, Sendable {
+    case system
+    case light
+    case dark
+
+    var displayName: String {
+        switch self {
+        case .system: "System"
+        case .light: "Light"
+        case .dark: "Dark"
+        }
+    }
+
+    /// `nil` lets SwiftUI fall through to the system setting — `.preferredColorScheme` only
+    /// forces an override for `.light`/`.dark`.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+}
 
 /// Which speech engine transcribes an utterance.
 enum SpeechEngineChoice: String, CaseIterable, Sendable {
@@ -91,6 +118,13 @@ final class Settings {
         didSet { defaults.set(muteWhileRecording, forKey: Keys.muteWhileRecording) }
     }
 
+    /// Overrides the system appearance for Shosh's own windows. `DS.Color` resolves per the
+    /// window's actual drawn appearance, so this is enough to make every token switch —
+    /// nothing else needs to know about it.
+    var appearance: AppearanceMode {
+        didSet { defaults.set(appearance.rawValue, forKey: Keys.appearance) }
+    }
+
     private let defaults = UserDefaults.standard
 
     private enum Keys {
@@ -105,6 +139,7 @@ final class Settings {
         static let translateToEnglish = "translateToEnglish"
         static let microphoneDeviceID = "microphoneDeviceID"
         static let muteWhileRecording = "muteWhileRecording"
+        static let appearance = "appearance"
     }
 
     private init() {
@@ -125,5 +160,6 @@ final class Settings {
         translateToEnglish = defaults.object(forKey: Keys.translateToEnglish) as? Bool ?? false
         microphoneDeviceID = defaults.string(forKey: Keys.microphoneDeviceID)
         muteWhileRecording = defaults.object(forKey: Keys.muteWhileRecording) as? Bool ?? false
+        appearance = AppearanceMode(rawValue: defaults.string(forKey: Keys.appearance) ?? "") ?? .system
     }
 }
