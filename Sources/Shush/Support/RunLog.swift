@@ -1,4 +1,4 @@
-import ShoshDictionary
+import ShushDictionary
 import Foundation
 
 /// One completed dictation.
@@ -86,7 +86,7 @@ struct DictationRun: Codable, Sendable, Identifiable {
 enum RunLog {
     static var directory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Shosh", isDirectory: true)
+            .appendingPathComponent("Shush", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base
     }

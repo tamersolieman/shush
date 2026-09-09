@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Styled from the Tamer Solieman Design System's tokens (colors.css / typography.css /
 /// spacing.css / effects.css), inlined directly rather than linked — this file ships alone
-/// to `~/Library/Application Support/Shosh/dashboard.html` and is opened in the default
+/// to `~/Library/Application Support/Shush/dashboard.html` and is opened in the default
 /// browser, which can't see fonts registered via `ATSApplicationFontsPath` (that's
 /// process-local to the app). Tajawal is embedded as base64 `@font-face` data instead.
 enum DashboardHTML {
@@ -36,7 +36,7 @@ enum DashboardHTML {
         <meta name="viewport" content="width=device-width,initial-scale=1">
         <!-- The app rewrites this file after every dictation; the page just reloads. -->
         <meta http-equiv="refresh" content="3">
-        <title>Shosh — engine comparison</title>
+        <title>Shush — engine comparison</title>
         <style>
         \(fontFaceCSS())
         :root{
@@ -117,7 +117,7 @@ enum DashboardHTML {
         <h1>Engine comparison</h1>
         <div class="bar">
           <div class="sub"><span class="dot"></span>\(runs.count) dictation\(runs.count == 1 ? "" : "s") recorded — reloads every 3s</div>
-          \(runs.isEmpty ? "" : "<a class=\"btn\" href=\"shosh://clear\">Clear results</a>")
+          \(runs.isEmpty ? "" : "<a class=\"btn\" href=\"shush://clear\">Clear results</a>")
         </div>
         \(body)
         <footer>

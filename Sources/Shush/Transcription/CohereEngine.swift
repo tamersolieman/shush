@@ -2,7 +2,7 @@ import AVFoundation
 import FluidAudio
 import Foundation
 
-/// Cohere Transcribe, via FluidAudio — the only one of Shosh's three engines that covers
+/// Cohere Transcribe, via FluidAudio — the only one of Shush's three engines that covers
 /// Arabic (also fr/de/es/it/pt/nl/pl/el/ja/zh/vi/ko — see `CohereAsrConfig.Language`).
 /// Apple's `SpeechTranscriber` and both Parakeet checkpoints don't: v2 is English-only and
 /// v3's "multilingual" is 25 European languages + Japanese, confirmed by querying

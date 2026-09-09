@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>Shosh</string>
+	<string>Shush</string>
 	<key>CFBundleDisplayName</key>
-	<string>Shosh</string>
-	<!-- Deliberately space-free and distinct from the existing app's `shosh`, so that
+	<string>Shush</string>
+	<!-- Deliberately space-free and distinct from the existing app's `shush`, so that
 	     `pkill`/`killall` on either app can never match the other. -->
 	<key>CFBundleExecutable</key>
-	<string>Shosh</string>
-	<!-- Separate from the existing Shosh's com.shosh.client: distinct TCC identity,
+	<string>Shush</string>
+	<!-- Separate from the existing Shush's com.shush.client: distinct TCC identity,
 	     distinct preferences domain, no shared state of any kind. -->
 	<key>CFBundleIdentifier</key>
-	<string>ai.pivotstudio.shosh</string>
+	<string>ai.pivotstudio.shush</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -32,10 +32,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>ai.pivotstudio.shosh</string>
+			<string>ai.pivotstudio.shush</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>shosh</string>
+				<string>shush</string>
 			</array>
 		</dict>
 	</array>
@@ -48,8 +48,8 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Shosh listens while you hold the push-to-talk key so it can turn your speech into text.</string>
+	<string>Shush listens while you hold the push-to-talk key so it can turn your speech into text.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Shosh transcribes your speech on-device to insert text where you're typing.</string>
+	<string>Shush transcribes your speech on-device to insert text where you're typing.</string>
 </dict>
 </plist>

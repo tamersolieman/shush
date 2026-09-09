@@ -1,4 +1,4 @@
-import ShoshDictionary
+import ShushDictionary
 import AVFoundation
 import AppKit
 import FluidAudio

@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// The design system for Shosh — a flat sidebar-nav app, from the Pencil design at
-/// `shosh_app.pen` (Dashboard / Transcripts / Dictionary / Settings, persistent left
+/// The design system for Shush — a flat sidebar-nav app, from the Pencil design at
+/// `shush_app.pen` (Dashboard / Transcripts / Dictionary / Settings, persistent left
 /// sidebar, blue accent on white/light-gray surfaces). Replaces the earlier hardware-panel
 /// direction entirely.
 ///
@@ -12,7 +12,7 @@ enum DS {
 
     // MARK: - Color
 
-    /// Light/dark pairs straight from the Pencil file's variables (`shosh_app.pen`, themed
+    /// Light/dark pairs straight from the Pencil file's variables (`shush_app.pen`, themed
     /// `mode: light/dark` values). Resolved per-appearance via `face(light:dark:)`, so every
     /// token below tracks whichever appearance the window is actually drawing in —
     /// including an explicit override from `Settings.appearance` (wired through
@@ -139,7 +139,7 @@ private extension NSColor {
 }
 
 /// The waveform brand mark, shared by the sidebar and the menu bar item — replaces the
-/// "Shosh" wordmark and the placeholder SF Symbol respectively.
+/// "Shush" wordmark and the placeholder SF Symbol respectively.
 struct BrandMark: View {
     var body: some View {
         if let url = Bundle.main.url(forResource: "BrandMark", withExtension: "png"),

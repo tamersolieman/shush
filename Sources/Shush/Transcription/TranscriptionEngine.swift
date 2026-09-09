@@ -21,7 +21,7 @@ struct TranscriptionChunk: Sendable {
     let isFinal: Bool
 }
 
-/// The seam that keeps Shosh engine-agnostic.
+/// The seam that keeps Shush engine-agnostic.
 ///
 /// Apple's `SpeechAnalyzer` ships with macOS 26 and needs no model download, so it is
 /// the default. Parakeet (FluidAudio, CoreML/ANE) scores better on English and is the

@@ -1,4 +1,4 @@
-import ShoshDictionary
+import ShushDictionary
 import AppKit
 import SwiftUI
 

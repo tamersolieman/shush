@@ -1,9 +1,9 @@
-import ShoshDictionary
+import ShushDictionary
 import AppKit
 import SwiftUI
 
 /// The app's main window — a persistent left sidebar plus a content area whose top bar and
-/// body change per section. Matches the Pencil design (`shosh_app.pen`): Dashboard,
+/// body change per section. Matches the Pencil design (`shush_app.pen`): Dashboard,
 /// Transcripts, Dictionary and Settings all live behind the same sidebar nav rather than
 /// Settings being a separate window.
 struct MainWindow: View {

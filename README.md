@@ -1,4 +1,4 @@
-# Shosh
+# Shush
 
 A native macOS push-to-talk dictation app. Hold a key, talk, release — the text lands wherever your cursor is. Everything runs on-device.
 
@@ -34,13 +34,13 @@ make build     # just build with SwiftPM
 make clean     # remove build artifacts
 ```
 
-The app needs **Accessibility** and **Microphone** permission (System Settings → Privacy & Security). macOS ties the Accessibility grant to the app's code signature — the Makefile signs with a stable local certificate (`Shosh Local Dev`, set up once per machine, not committed) rather than ad-hoc, so the grant survives rebuilds. Without that cert it falls back to ad-hoc signing, which means re-granting Accessibility after every `make install`.
+The app needs **Accessibility** and **Microphone** permission (System Settings → Privacy & Security). macOS ties the Accessibility grant to the app's code signature — the Makefile signs with a stable local certificate (`Shush Local Dev`, set up once per machine, not committed) rather than ad-hoc, so the grant survives rebuilds. Without that cert it falls back to ad-hoc signing, which means re-granting Accessibility after every `make install`.
 
 ## Architecture
 
-- `Sources/Shosh/Core/` — hotkey capture (`HotkeyMonitor`, `KeyRecorder`), audio (`AudioCapture`, `MicrophoneDevices`, `SystemAudio`), the dictation state machine (`DictationController`), text injection.
-- `Sources/Shosh/Transcription/` — the `TranscriptionEngine` protocol and its three implementations (`AppleSpeechEngine`, `ParakeetEngine`, `CohereEngine`).
-- `Sources/Shosh/Dictionary/` — the dictionary store; the correction/bias logic itself lives in the separate `ShoshDictionary` target (`Sources/ShoshDictionary/`) so it can be unit tested and shares test vectors with the Windows port.
-- `Sources/Shosh/Formatting/` — cleanup (rule-based and on-device LLM) and translation.
-- `Sources/Shosh/UI/` — `MainWindow` (sidebar nav: Dashboard / Transcripts / Dictionary / Settings), `DesignSystem` (all color/type/spacing tokens), the floating HUD, the Settings page, the engine-comparison window.
-- `Sources/Shosh/Support/` — `Settings` (all persisted preferences), logging, permissions, run history.
+- `Sources/Shush/Core/` — hotkey capture (`HotkeyMonitor`, `KeyRecorder`), audio (`AudioCapture`, `MicrophoneDevices`, `SystemAudio`), the dictation state machine (`DictationController`), text injection.
+- `Sources/Shush/Transcription/` — the `TranscriptionEngine` protocol and its three implementations (`AppleSpeechEngine`, `ParakeetEngine`, `CohereEngine`).
+- `Sources/Shush/Dictionary/` — the dictionary store; the correction/bias logic itself lives in the separate `ShushDictionary` target (`Sources/ShushDictionary/`) so it can be unit tested and shares test vectors with the Windows port.
+- `Sources/Shush/Formatting/` — cleanup (rule-based and on-device LLM) and translation.
+- `Sources/Shush/UI/` — `MainWindow` (sidebar nav: Dashboard / Transcripts / Dictionary / Settings), `DesignSystem` (all color/type/spacing tokens), the floating HUD, the Settings page, the engine-comparison window.
+- `Sources/Shush/Support/` — `Settings` (all persisted preferences), logging, permissions, run history.

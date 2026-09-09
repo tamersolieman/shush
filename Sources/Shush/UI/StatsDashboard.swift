@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The app's usage dashboard — words/minute, dictionary fixes, totals, per-app breakdown,
 /// and a streak calendar. All computed from `RunLog`'s own history; nothing here is
-/// benchmarked against other users, because Shosh only ever sees this machine.
+/// benchmarked against other users, because Shush only ever sees this machine.
 struct StatsDashboard: View {
     @State private var store = RunStore.shared
     private var stats: DictationStats { DictationStats(runs: store.runs) }

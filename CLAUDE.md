@@ -4,7 +4,7 @@ Guidance for Claude Code sessions working in this repo.
 
 ## What this is
 
-Shosh — a native macOS push-to-talk dictation app (SwiftUI, macOS 26+). Forked from
+Shush — a native macOS push-to-talk dictation app (SwiftUI, macOS 26+). Forked from
 per-simmons/murmur-youtube and rebranded, then substantially extended (arbitrary
 push-to-talk key, toggle mode, cancel shortcut, microphone/mute settings, a third
 transcription engine for Arabic, a native usage dashboard, a full visual redesign from a
@@ -27,13 +27,13 @@ permissions.
 
 TCC (Accessibility, Microphone) keys its grant to the app's exact code signature. The
 Makefile prefers a real "Developer ID Application" identity, then a self-signed
-**"Shosh Local Dev"** certificate (set up once per machine in the login keychain — not
+**"Shush Local Dev"** certificate (set up once per machine in the login keychain — not
 committed, nothing to check in), then falls back to ad-hoc (`-`).
 
 If `security find-identity -v -p codesigning` shows no usable identity, every rebuild gets a
 new ad-hoc signature and the user's Accessibility grant silently breaks — the hotkey stops
 firing with `tapCreate failed — Accessibility permission missing?` in the log
-(`log show --predicate 'subsystem == "ai.pivotstudio.shosh"' --style compact --last 5m`).
+(`log show --predicate 'subsystem == "ai.pivotstudio.shush"' --style compact --last 5m`).
 Fix: set up the local cert once (self-signed, `codeSigning` extended key usage, imported and
 trusted via `security add-trusted-cert -p codeSign`), which the Makefile then picks up
 automatically. After any resign, if this is a fresh machine or the cert doesn't exist yet,
@@ -41,7 +41,7 @@ tell the user to re-grant Accessibility — don't assume it silently still works
 
 ## Design system
 
-Every color/type/spacing/radius/shadow value lives in `Sources/Shosh/UI/DesignSystem.swift`
+Every color/type/spacing/radius/shadow value lives in `Sources/Shush/UI/DesignSystem.swift`
 (`DS.Color`, `DS.Font`, `DS.Space`, `DS.Radius`, `DS.Border`, `DS.Motion`). Views never
 declare ad-hoc colors or hardcoded pixel values — extend `DS` instead. Colors are
 appearance-aware (`face(light:dark:)`, an `NSColor` dynamic provider), and
@@ -49,14 +49,14 @@ appearance-aware (`face(light:dark:)`, an `NSColor` dynamic provider), and
 serve system-follow, forced-light, and forced-dark without per-view branching.
 
 The current visual language comes from a Pencil (pen.dev) design file the user shared
-(`shosh_app.pen`, local at `~/Documents/pencile designs/`) — sidebar nav, flat white/gray
+(`shush_app.pen`, local at `~/Documents/pencile designs/`) — sidebar nav, flat white/gray
 cards, blue accent (`#3B82F6` light / `#60A5FA` dark). If asked to adjust the design, prefer
 reading that file's variables/screens (via the `mcp__pencil__*` tools) over guessing at
 values — it's the source of truth, including the dark-theme hex pairs.
 
 ## Engines
 
-Three `TranscriptionEngine` implementations (`Sources/Shosh/Transcription/`):
+Three `TranscriptionEngine` implementations (`Sources/Shush/Transcription/`):
 `AppleSpeechEngine` (streaming, on-device, no download), `ParakeetEngine` (batch, NVIDIA
 Parakeet via FluidAudio), `CohereEngine` (batch, also FluidAudio — the only one covering
 Arabic + 13 other languages). Before assuming an engine supports a language, check
@@ -66,8 +66,8 @@ Parakeet v3's "multilingual" is 25 European languages + Japanese only.
 
 ## Dictionary
 
-The correction/bias logic (`DictionaryCorrector`) lives in a separate `ShoshDictionary`
-SwiftPM target, not in the main `Shosh` target — it's unit tested independently and shares
+The correction/bias logic (`DictionaryCorrector`) lives in a separate `ShushDictionary`
+SwiftPM target, not in the main `Shush` target — it's unit tested independently and shares
 `shared/dictionary-test-vectors.json`-style test vectors with the (not-present-in-this-repo)
 Windows port's C# reimplementation. Keep new correction logic there, not inline in the app
 target.

@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "Shosh",
+    name: "Shush",
     platforms: [.macOS(.v26)],
     dependencies: [
         // Parakeet TDT as CoreML on the Neural Engine. Optional at runtime — Apple's
@@ -14,25 +14,25 @@ let package = Package(
         // behaviour is a cross-platform contract: the Windows app reimplements this logic in
         // C#, and both sides run the same vectors in shared/dictionary-test-vectors.json.
         .target(
-            name: "ShoshDictionary",
-            path: "Sources/ShoshDictionary",
+            name: "ShushDictionary",
+            path: "Sources/ShushDictionary",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .executableTarget(
-            name: "Shosh",
+            name: "Shush",
             dependencies: [
-                "ShoshDictionary",
+                "ShushDictionary",
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ],
-            path: "Sources/Shosh",
+            path: "Sources/Shush",
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]
         ),
         .testTarget(
-            name: "ShoshDictionaryTests",
-            dependencies: ["ShoshDictionary"],
-            path: "Tests/ShoshDictionaryTests",
+            name: "ShushDictionaryTests",
+            dependencies: ["ShushDictionary"],
+            path: "Tests/ShushDictionaryTests",
             resources: [.copy("dictionary-test-vectors.json")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

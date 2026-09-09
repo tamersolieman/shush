@@ -3,7 +3,7 @@ import AppKit
 import ApplicationServices
 import Foundation
 
-/// Shosh needs two grants, and neither can be worked around:
+/// Shush needs two grants, and neither can be worked around:
 /// - **Microphone** — obviously.
 /// - **Accessibility** — for both the `CGEventTap` (hotkey) and the AX text insert.
 ///

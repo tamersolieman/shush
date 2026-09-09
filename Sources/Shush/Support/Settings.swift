@@ -118,7 +118,7 @@ final class Settings {
         didSet { defaults.set(muteWhileRecording, forKey: Keys.muteWhileRecording) }
     }
 
-    /// Overrides the system appearance for Shosh's own windows. `DS.Color` resolves per the
+    /// Overrides the system appearance for Shush's own windows. `DS.Color` resolves per the
     /// window's actual drawn appearance, so this is enough to make every token switch —
     /// nothing else needs to know about it.
     var appearance: AppearanceMode {
