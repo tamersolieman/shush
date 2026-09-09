@@ -144,7 +144,7 @@ struct BrandMark: View {
     var body: some View {
         if let url = Bundle.main.url(forResource: "BrandMark", withExtension: "png"),
            let image = NSImage(contentsOf: url) {
-            Image(nsImage: image).resizable()
+            Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
         } else {
             Image(systemName: "waveform")
         }

@@ -20,6 +20,8 @@ struct SettingsPageView: View {
                 AudioSection(settings: settings)
                 ModelSection(settings: settings)
                 CleanupSection(settings: settings)
+                HistorySection(settings: settings)
+                AboutSection(settings: settings)
             }
             .padding(DS.Space.panel)
         }
@@ -412,6 +414,201 @@ private struct CleanupSection: View {
         }
         .padding(.horizontal, DS.Space.base)
         .padding(.vertical, DS.Space.base)
+    }
+}
+
+// MARK: - History
+
+private struct HistorySection: View {
+    @Bindable var settings: Settings
+
+    var body: some View {
+        SectionHeader(title: "History")
+
+        SettingsRow(title: "History Limit") {
+            HStack(spacing: DS.Space.snug) {
+                Stepper(value: $settings.historyLimit, in: 1...1000) {
+                    Text("\(settings.historyLimit)")
+                        .font(DS.Font.value)
+                        .foregroundStyle(DS.Color.textPrimary)
+                        .frame(width: 32, alignment: .trailing)
+                }
+                Text("entries")
+                    .font(DS.Font.value)
+                    .foregroundStyle(DS.Color.textTertiary)
+            }
+        }
+        CardDivider()
+
+        HStack {
+            Text("Maximum number of history entries to keep")
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.Space.base)
+        .padding(.bottom, DS.Space.snug)
+        CardDivider()
+
+        SettingsRow(title: "Auto-Delete Recordings") {
+            Menu {
+                ForEach(AutoDeleteInterval.allCases, id: \.self) { interval in
+                    Button(interval.displayName) { settings.autoDeleteInterval = interval }
+                }
+            } label: {
+                HStack(spacing: DS.Space.tight) {
+                    Text(settings.autoDeleteInterval.displayName)
+                        .font(DS.Font.value)
+                        .foregroundStyle(DS.Color.textTertiary)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(DS.Color.textSecondary)
+                }
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        }
+
+        HStack {
+            Text("Automatically delete old recordings to save space")
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.Space.base)
+        .padding(.vertical, DS.Space.base)
+    }
+}
+
+// MARK: - About
+
+private struct AboutSection: View {
+    @Bindable var settings: Settings
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    }
+
+    var body: some View {
+        SectionHeader(title: "About")
+
+        // No localization exists yet — English is the only option, kept here as the slot
+        // this setting will live in once Shush ships more than one language.
+        SettingsRow(title: "Application Language") {
+            Text("English")
+                .font(DS.Font.value)
+                .foregroundStyle(DS.Color.textTertiary)
+        }
+        RowSubtitle("Change the language of the Shush interface")
+        CardDivider()
+
+        SettingsRow(title: "Version") {
+            Text("v\(appVersion)")
+                .font(DS.Font.value)
+                .foregroundStyle(DS.Color.textTertiary)
+        }
+        RowSubtitle("Current version of Shush")
+        CardDivider()
+
+        ToggleRow(title: "Show What's New", isOn: $settings.showWhatsNew)
+        RowSubtitle("Show release notes after Shush updates")
+        CardDivider()
+
+        SettingsRow(title: "Website") {
+            Button {
+                NSWorkspace.shared.open(URL(string: "https://www.tamersolieman.com")!)
+            } label: {
+                Text("Visit Website")
+                    .font(DS.Font.button)
+                    .foregroundStyle(DS.Color.textPrimary)
+                    .padding(.horizontal, DS.Space.roomy)
+                    .frame(height: 32)
+                    .background(DS.Color.surfaceSecondary, in: .rect(cornerRadius: DS.Radius.pill))
+            }
+            .buttonStyle(.plain)
+        }
+        RowSubtitle("Visit the Shush website")
+        CardDivider()
+
+        DirectoryRow(
+            title: "App Data Directory",
+            subtitle: "Location where Shush stores its data",
+            path: RunLog.directory.path
+        ) {
+            NSWorkspace.shared.activateFileViewerSelecting([RunLog.directory])
+        }
+        CardDivider()
+
+        // Shush logs through the unified logging system rather than plain files, so there's
+        // no directory to open — Console is the equivalent "Open" destination, prefiltered
+        // to Shush's own subsystem.
+        DirectoryRow(
+            title: "Log Directory",
+            subtitle: "Shush logs to Console, not a file — no on-disk log directory",
+            path: "log stream --predicate 'subsystem == \"ai.pivotstudio.shush\"'"
+        ) {
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Console.app"))
+        }
+    }
+}
+
+private struct RowSubtitle: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        HStack {
+            Text(text)
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.Space.base)
+        .padding(.bottom, DS.Space.base)
+    }
+}
+
+private struct DirectoryRow: View {
+    let title: String
+    let subtitle: String
+    let path: String
+    let action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.tight) {
+            Text(title)
+                .font(DS.Font.label)
+                .foregroundStyle(DS.Color.textPrimary)
+            Text(subtitle)
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.textTertiary)
+        }
+        .padding(.horizontal, DS.Space.base)
+        .padding(.top, DS.Space.base)
+
+        HStack(spacing: DS.Space.snug) {
+            Text(path)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(DS.Color.textSecondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, DS.Space.base)
+                .frame(height: 36)
+                .background(DS.Color.surfaceSecondary, in: .rect(cornerRadius: DS.Radius.control))
+
+            Button(action: action) {
+                Text("Open")
+                    .font(DS.Font.button)
+                    .foregroundStyle(DS.Color.textPrimary)
+                    .padding(.horizontal, DS.Space.roomy)
+                    .frame(height: 32)
+                    .background(DS.Color.surfaceSecondary, in: .rect(cornerRadius: DS.Radius.pill))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, DS.Space.base)
+        .padding(.bottom, DS.Space.base)
     }
 }
 

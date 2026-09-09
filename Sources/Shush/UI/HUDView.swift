@@ -38,19 +38,21 @@ struct HUDView: View {
                 .padding(8)
         }
         .frame(width: 420, height: 76)
+        // `.background(Material, in: Shape)` is the form that actually clips the material's
+        // backdrop blur to the rounded shape — nesting `Shape().fill(.ultraThinMaterial)`
+        // inside further `.overlay`s let the blur's compositing layer bleed past the
+        // corners on some GPUs (square notches poking out of two opposite corners).
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .background {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(DS.Color.surface.opacity(0.55))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(DS.Color.border, lineWidth: DS.Border.hairline)
-                }
-                .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+                .fill(DS.Color.surface.opacity(0.55))
         }
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(DS.Color.border, lineWidth: DS.Border.hairline)
+        }
+        .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
         .preferredColorScheme(settings.appearance.colorScheme)
     }
 

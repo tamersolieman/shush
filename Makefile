@@ -46,10 +46,17 @@ all: app
 build:
 	swift build -c $(CONFIG) --scratch-path "$(SCRATCH)"
 
-## Regenerates AppIcon.icns from Tools/makeicon.swift. Not a dependency of `app` — the
-## icon rarely changes and rendering 10 PNGs on every build is wasted time.
+## Regenerates AppIcon.icns from Resources/AppIcon-source.png (1024x1024). Not a
+## dependency of `app` — the icon rarely changes.
 icon:
-	@swift Tools/makeicon.swift
+	@rm -rf Resources/AppIcon.iconset
+	@mkdir -p Resources/AppIcon.iconset
+	@for spec in "16 icon_16x16.png" "32 icon_16x16@2x.png" "32 icon_32x32.png" "64 icon_32x32@2x.png" \
+	             "128 icon_128x128.png" "256 icon_128x128@2x.png" "256 icon_256x256.png" \
+	             "512 icon_256x256@2x.png" "512 icon_512x512.png" "1024 icon_512x512@2x.png"; do \
+	  set -- $$spec; \
+	  sips -z $$1 $$1 Resources/AppIcon-source.png --out "Resources/AppIcon.iconset/$$2" >/dev/null; \
+	done
 	@iconutil -c icns Resources/AppIcon.iconset -o Resources/AppIcon.icns
 	@echo "wrote Resources/AppIcon.icns"
 

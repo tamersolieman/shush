@@ -11,6 +11,7 @@ struct MainWindow: View {
     @State private var settings = Settings.shared
 
     @State private var section: Section = .dashboard
+    @State private var sidebarVisible = true
 
     enum Section: String, CaseIterable, Identifiable {
         case dashboard, transcripts, dictionary, settings
@@ -36,12 +37,24 @@ struct MainWindow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            Sidebar(section: $section)
+            Sidebar(section: $section, isCollapsed: !sidebarVisible)
             ContentArea(controller: controller, section: section)
         }
+        .animation(DS.Motion.base, value: sidebarVisible)
         .frame(minWidth: 960, minHeight: 640)
         .background(DS.Color.background)
         .preferredColorScheme(settings.appearance.colorScheme)
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    sidebarVisible.toggle()
+                } label: {
+                    Image(systemName: "sidebar.leading")
+                }
+                .keyboardShortcut("s", modifiers: [.command, .control])
+                .help(sidebarVisible ? "Collapse Sidebar" : "Expand Sidebar")
+            }
+        }
     }
 }
 
@@ -49,15 +62,18 @@ struct MainWindow: View {
 
 private struct Sidebar: View {
     @Binding var section: MainWindow.Section
+    /// Collapsed keeps every nav item as an icon-only rail instead of hiding the sidebar
+    /// outright — same idea as Xcode/Mail's collapsed sidebar.
+    let isCollapsed: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Space.section) {
+        VStack(alignment: isCollapsed ? .center : .leading, spacing: DS.Space.section) {
             BrandMark()
                 .frame(width: 28, height: 28)
 
-            VStack(alignment: .leading, spacing: DS.Space.snug) {
+            VStack(alignment: isCollapsed ? .center : .leading, spacing: DS.Space.snug) {
                 ForEach(MainWindow.Section.allCases) { candidate in
-                    NavRow(section: candidate, isSelected: section == candidate) {
+                    NavRow(section: candidate, isSelected: section == candidate, isCollapsed: isCollapsed) {
                         section = candidate
                     }
                 }
@@ -65,8 +81,8 @@ private struct Sidebar: View {
 
             Spacer()
         }
-        .padding(DS.Space.wide)
-        .frame(width: 240)
+        .padding(isCollapsed ? DS.Space.base : DS.Space.wide)
+        .frame(width: isCollapsed ? 64 : 240)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(DS.Color.sidebarBackground)
     }
@@ -75,6 +91,7 @@ private struct Sidebar: View {
 private struct NavRow: View {
     let section: MainWindow.Section
     let isSelected: Bool
+    let isCollapsed: Bool
     let action: () -> Void
 
     var body: some View {
@@ -84,16 +101,20 @@ private struct NavRow: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(isSelected ? DS.Color.primary : DS.Color.textSecondary)
                     .frame(width: 16)
-                Text(section.title)
-                    .font(DS.Font.navLabel)
-                    .foregroundStyle(isSelected ? DS.Color.primary : DS.Color.textPrimary)
-                Spacer(minLength: 0)
+                if !isCollapsed {
+                    Text(section.title)
+                        .font(DS.Font.navLabel)
+                        .foregroundStyle(isSelected ? DS.Color.primary : DS.Color.textPrimary)
+                    Spacer(minLength: 0)
+                }
             }
             .padding(.horizontal, DS.Space.base)
             .frame(height: 40)
+            .frame(maxWidth: isCollapsed ? nil : .infinity)
             .background(isSelected ? DS.Color.primaryLight : .clear, in: .rect(cornerRadius: DS.Radius.control))
         }
         .buttonStyle(.plain)
+        .help(section.title)
     }
 }
 

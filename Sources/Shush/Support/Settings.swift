@@ -28,6 +28,36 @@ enum AppearanceMode: String, CaseIterable, Sendable {
     }
 }
 
+/// How long a history entry survives before `RunLog` purges it automatically.
+enum AutoDeleteInterval: String, CaseIterable, Sendable {
+    case never
+    case oneDay
+    case threeDays
+    case sevenDays
+    case thirtyDays
+
+    var displayName: String {
+        switch self {
+        case .never: "Never"
+        case .oneDay: "After 1 day"
+        case .threeDays: "After 3 days"
+        case .sevenDays: "After 7 days"
+        case .thirtyDays: "After 30 days"
+        }
+    }
+
+    /// Entries older than this are purged. `nil` means keep everything.
+    var maxAge: TimeInterval? {
+        switch self {
+        case .never: nil
+        case .oneDay: 86_400
+        case .threeDays: 3 * 86_400
+        case .sevenDays: 7 * 86_400
+        case .thirtyDays: 30 * 86_400
+        }
+    }
+}
+
 /// Which speech engine transcribes an utterance.
 enum SpeechEngineChoice: String, CaseIterable, Sendable {
     case apple
@@ -125,6 +155,23 @@ final class Settings {
         didSet { defaults.set(appearance.rawValue, forKey: Keys.appearance) }
     }
 
+    /// Oldest entries beyond this count are trimmed from `RunLog` whenever a new one is
+    /// recorded.
+    var historyLimit: Int {
+        didSet { defaults.set(historyLimit, forKey: Keys.historyLimit) }
+    }
+
+    /// Entries older than this are purged from `RunLog` on the same schedule.
+    var autoDeleteInterval: AutoDeleteInterval {
+        didSet { defaults.set(autoDeleteInterval.rawValue, forKey: Keys.autoDeleteInterval) }
+    }
+
+    /// Show release notes after an update. No changelog UI exists yet — this just holds the
+    /// preference for when one does.
+    var showWhatsNew: Bool {
+        didSet { defaults.set(showWhatsNew, forKey: Keys.showWhatsNew) }
+    }
+
     private let defaults = UserDefaults.standard
 
     private enum Keys {
@@ -140,6 +187,9 @@ final class Settings {
         static let microphoneDeviceID = "microphoneDeviceID"
         static let muteWhileRecording = "muteWhileRecording"
         static let appearance = "appearance"
+        static let historyLimit = "historyLimit"
+        static let autoDeleteInterval = "autoDeleteInterval"
+        static let showWhatsNew = "showWhatsNew"
     }
 
     private init() {
@@ -161,5 +211,11 @@ final class Settings {
         microphoneDeviceID = defaults.string(forKey: Keys.microphoneDeviceID)
         muteWhileRecording = defaults.object(forKey: Keys.muteWhileRecording) as? Bool ?? false
         appearance = AppearanceMode(rawValue: defaults.string(forKey: Keys.appearance) ?? "") ?? .system
+        let storedLimit = defaults.object(forKey: Keys.historyLimit) as? Int
+        historyLimit = storedLimit ?? 10
+        autoDeleteInterval = AutoDeleteInterval(
+            rawValue: defaults.string(forKey: Keys.autoDeleteInterval) ?? ""
+        ) ?? .threeDays
+        showWhatsNew = defaults.object(forKey: Keys.showWhatsNew) as? Bool ?? true
     }
 }

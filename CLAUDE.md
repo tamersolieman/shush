@@ -39,6 +39,12 @@ trusted via `security add-trusted-cert -p codeSign`), which the Makefile then pi
 automatically. After any resign, if this is a fresh machine or the cert doesn't exist yet,
 tell the user to re-grant Accessibility — don't assume it silently still works.
 
+## Version bumps
+
+`CFBundleShortVersionString` in `Resources/Info.plist` is shown to the user (Settings →
+About → Version). Bump it — patch by default, minor for a user-visible feature — on any
+change worth shipping, in the same commit as the change.
+
 ## Design system
 
 Every color/type/spacing/radius/shadow value lives in `Sources/Shush/UI/DesignSystem.swift`

@@ -294,13 +294,38 @@ final class DictationController {
             // or the tail of the utterance gets dropped.
             audioContinuation?.finish()
             audioContinuation = nil
-            recorded = await feedTask?.value ?? []
-            feedTask = nil
 
-            await engine?.finish()
-            await consumeTask?.value
+            // A wedged engine call (native model code stuck, `finalizeAndFinishThroughEndOfInput`
+            // never returning) used to leave `state` parked at `.finishing` forever — the HUD
+            // stuck on "Transcribing…" and every further hold a no-op, since `endDictation`
+            // guards on `state != .finishing`. Race the finalize sequence against a timeout so
+            // the app always recovers to `.idle` even if the stuck call itself never unblocks;
+            // the abandoned task is left to finish (or not) on its own rather than blocking UI.
+            let outcome = await withTaskGroup(of: [AudioChunk]?.self) { group in
+                // `TaskGroup.addTask { @MainActor in ... self ... }` directly trips a Swift
+                // region-isolation-checker bug ("pattern the checker does not understand").
+                // Routing through a plain `Task { @MainActor in }.value` from a non-isolated
+                // addTask closure sidesteps it.
+                group.addTask { await Task { @MainActor in await self.drainFeedFinishAndConsume() }.value }
+                group.addTask {
+                    try? await Task.sleep(for: .seconds(30))
+                    return nil
+                }
+                let first = await group.next() ?? nil
+                group.cancelAll()
+                return first
+            }
+
+            feedTask = nil
             consumeTask = nil
             engine = nil
+
+            guard let recording = outcome else {
+                Log.speech.error("dictation finalize timed out after 30s — resetting to idle")
+                fail("Transcription took too long and was cancelled.")
+                return
+            }
+            recorded = recording
 
             if isComparing {
                 await runComparison()
@@ -366,13 +391,46 @@ final class DictationController {
         capture.stop()
         audioContinuation?.finish()
         audioContinuation = nil
-        await feedTask?.value
+
+        // Same wedged-engine risk as `endDictation`'s finalize race — bound the wait so an
+        // early release during startup can't strand `state` at `.finishing` either.
+        let finished: Bool? = await withTaskGroup(of: Bool?.self) { group in
+            group.addTask { await Task { @MainActor in await self.drainFeedAndFinish() }.value }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(30))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+        if finished == nil {
+            Log.speech.error("dictation teardown timed out after 30s — resetting to idle")
+        }
+
         feedTask = nil
-        await engine?.finish()
         engine = nil
         consumeTask?.cancel()
         consumeTask = nil
         state = .idle
+    }
+
+    /// The `.finishing`-tail work shared by `endDictation` and `teardown`, factored out so
+    /// each can race it against a timeout — a bare `TaskGroup.addTask { @MainActor in ... }`
+    /// closure that both awaits actor calls *and* mutates `self` in the same body trips a
+    /// Swift region-isolation-checker bug ("pattern the checker does not understand"), so the
+    /// work has to live in its own method and the child task just calls it.
+    private func drainFeedFinishAndConsume() async -> [AudioChunk] {
+        let recording = await feedTask?.value ?? []
+        await engine?.finish()
+        await consumeTask?.value
+        return recording
+    }
+
+    private func drainFeedAndFinish() async -> Bool {
+        _ = await feedTask?.value
+        await engine?.finish()
+        return true
     }
 
     // MARK: - Helpers

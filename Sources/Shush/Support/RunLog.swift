@@ -96,12 +96,16 @@ enum RunLog {
 
     static func record(_ run: DictationRun) {
         append(run)
+        LifetimeStatsStore.shared.record(run)
         regenerate()
         RunStore.shared.reload()
     }
 
     static func record(_ runs: [DictationRun]) {
-        runs.forEach(append)
+        runs.forEach {
+            append($0)
+            LifetimeStatsStore.shared.record($0)
+        }
         regenerate()
         RunStore.shared.reload()
     }
@@ -131,6 +135,7 @@ enum RunLog {
     }
 
     static func regenerate() {
+        enforceRetention()
         let runs = load()
         try? DashboardHTML.render(
             runs: runs,
@@ -163,6 +168,12 @@ enum RunLog {
     /// Replaces the whole file. Deleting can't be an append, and rewriting also persists the
     /// ids that older runs were assigned on load.
     private static func rewrite(_ runs: [DictationRun]) {
+        writeLines(runs)
+        regenerate()
+        RunStore.shared.reload()
+    }
+
+    private static func writeLines(_ runs: [DictationRun]) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
 
@@ -174,8 +185,26 @@ enum RunLog {
         // Atomic: a partial write here would lose history that the user didn't ask to delete.
         try? (body.isEmpty ? "" : body + "\n")
             .write(to: runsURL, atomically: true, encoding: .utf8)
+    }
 
-        regenerate()
-        RunStore.shared.reload()
+    /// Purges entries past `Settings.autoDeleteInterval`, then trims down to
+    /// `Settings.historyLimit` most-recent entries. Runs before every dashboard regenerate,
+    /// so it applies on launch as well as after each new run.
+    private static func enforceRetention() {
+        var runs = load()
+        let before = runs.count
+
+        if let maxAge = Settings.shared.autoDeleteInterval.maxAge {
+            let cutoff = Date().addingTimeInterval(-maxAge)
+            runs = runs.filter { $0.date >= cutoff }
+        }
+
+        let limit = Settings.shared.historyLimit
+        if limit > 0, runs.count > limit {
+            runs = Array(runs.suffix(limit))
+        }
+
+        guard runs.count != before else { return }
+        writeLines(runs)
     }
 }
