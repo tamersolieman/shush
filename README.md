@@ -6,18 +6,43 @@ Forked from [per-simmons/murmur-youtube](https://github.com/per-simmons/murmur-y
 
 ## Features
 
+### Dictation
+
 - **Push-to-talk or toggle mode**, with any key or modifier as the shortcut (not a fixed list — press whatever you want to record with, and it's captured live).
-- **Three speech engines**, switchable in Settings:
-  - **Apple** — macOS 26's on-device `SpeechTranscriber`. Streams text live, no download.
-  - **Parakeet** (NVIDIA, via [FluidAudio](https://github.com/FluidInference/FluidAudio)) — batch, resolves on release, ~470 MB model.
-  - **Cohere Transcribe** (also via FluidAudio) — the only engine here that covers Arabic, plus French, German, Spanish, Italian, Portuguese, Dutch, Polish, Greek, Japanese, Chinese, Vietnamese, Korean.
-- **On-device translation** — translate a non-English dictation to English before it's typed, when a specific source language is selected.
-- **Dictionary** — teach it words and phrases it keeps getting wrong, plus "when you hear X, write Y" corrections. Runs both as a bias pass before transcription and a guaranteed find-and-replace pass after.
-- **Dashboard** — words per minute, dictionary fixes, total words dictated, per-app usage breakdown, and a GitHub-style streak calendar, all computed from your own dictation history.
-- **Engine comparison mode** — record with every engine at once and see the results side by side (nothing is injected in this mode).
 - **Cancel shortcut** (Escape) — discards the current recording without typing anything.
 - **Mute-while-recording**, **microphone selection**, and **audio feedback** toggles.
+- **Voice activity detection** and **filler-word removal**, plus custom-word controls, in Transcription settings.
+- **Engine comparison mode** — record with every engine at once and see the results side by side (nothing is injected in this mode).
+
+### Speech engines
+
+Three, switchable in Settings:
+
+- **Apple** — macOS 26's on-device `SpeechTranscriber`. Streams text live, no download.
+- **Parakeet** (NVIDIA, via [FluidAudio](https://github.com/FluidInference/FluidAudio)) — batch, resolves on release, ~470 MB model.
+- **Cohere Transcribe** (also via FluidAudio) — the only engine here that covers Arabic, plus French, German, Spanish, Italian, Portuguese, Dutch, Polish, Greek, Japanese, Chinese, Vietnamese, Korean.
+
+### Cleanup, translation, and correction
+
+- **On-device translation** — translate a non-English dictation to English before it's typed, when a specific source language is selected.
+- **Dictionary** — teach it words and phrases it keeps getting wrong, plus "when you hear X, write Y" corrections. Runs both as a bias pass before transcription and a guaranteed find-and-replace pass after.
+- **Opt-in live-correction learning** — after text is injected, briefly watches the focused field for a hand-corrected word or phrase and offers to save it as a dictionary correction. Off by default; no-ops silently on apps that don't expose Accessibility text (Electron, terminals).
+
+### Dashboard
+
+- **KPI strip and trend chart** — words per minute, dictionary fixes, total words dictated, computed from your own dictation history.
+- **Per-app usage breakdown** and a **GitHub-style streak calendar**.
+- **History retention settings** and **lifetime stats** that persist independent of the visible transcript history.
+
+### Sync
+
+- **Google account sign-in with Drive sync** — Settings, the custom Dictionary, and lifetime dashboard stats sync across machines via a private `appDataFolder` in your own Google Drive. Settings and Dictionary are last-write-wins; lifetime stats merge additively per device, so switching machines never erases recorded work.
+
+### Interface
+
+- **Sidebar navigation** (collapsible) across Dashboard, Transcripts, Dictionary, and Settings, with Settings sections as collapsible cards.
 - **Light/dark theme**, independent of the system setting.
+- Full visual redesign from a Pencil (pen.dev) design file — flat cards, blue accent, consistent light/dark tokens throughout.
 
 ## Requirements
 
