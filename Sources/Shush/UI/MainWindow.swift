@@ -41,7 +41,9 @@ struct MainWindow: View {
             ContentArea(controller: controller, section: section)
         }
         .animation(DS.Motion.base, value: sidebarVisible)
-        .frame(minWidth: 960, minHeight: 640)
+        // 960 was enough for the dashboard's old 3-card layout; the 5-tile KPI strip plus a
+        // fixed-ish right column needs more room, especially with the sidebar expanded.
+        .frame(minWidth: 1100, minHeight: 640)
         .background(DS.Color.background)
         .preferredColorScheme(settings.appearance.colorScheme)
         .toolbar {

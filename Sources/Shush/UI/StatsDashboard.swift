@@ -32,7 +32,7 @@ struct StatsDashboard: View {
                             DictionaryFixesCard(stats: stats)
                             BusiestWeekdayCard(stats: stats)
                         }
-                        .frame(width: 340)
+                        .frame(minWidth: 260, maxWidth: 340)
                     }
 
                     StreakCard(stats: stats)
@@ -493,23 +493,41 @@ private struct UsageBar: View {
     private var percentText: String { "\(Int((app.fraction * 100).rounded()))%" }
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: DS.Radius.chip)
-                    .fill(DS.Color.surfaceSecondary)
-                RoundedRectangle(cornerRadius: DS.Radius.chip)
-                    .fill(DS.Color.primary.opacity(shade))
-                    .frame(width: max(geo.size.width * app.fraction, 40))
-                    .overlay(alignment: .trailing) {
-                        Text(percentText)
-                            .font(DS.Font.semibold(11))
-                            .foregroundStyle(.white)
-                            .padding(.trailing, DS.Space.snug)
-                    }
-            }
+        ZStack(alignment: .trailing) {
+            DynamicBar(fraction: app.fraction, tint: DS.Color.primary.opacity(shade))
+            Text(percentText)
+                .font(DS.Font.semibold(11))
+                .foregroundStyle(.white)
+                .padding(.trailing, DS.Space.snug)
         }
         .frame(height: 28)
-        .frame(maxWidth: .infinity)
+    }
+}
+
+/// A proportional fill bar sized entirely by its container's flexible layout — no
+/// `GeometryReader`. `GeometryReader` has no well-defined "ideal size," and asking for one
+/// as a `Grid` cell (`UsageBar`) or between rigid `HStack` siblings (`BusiestWeekdayCard`)
+/// let the reported width balloon far past the actual window, which is what was blowing the
+/// whole dashboard's layout out past its edge whenever the sidebar toggled changed the
+/// available width. `.scaleEffect` only affects rendering, not layout, so the fill can shrink
+/// from a full-width shape without ever telling its parent it needs more room than it has —
+/// and because it's driven by the container's live width on every layout pass, it stays
+/// correct through the sidebar's expand/collapse animation instead of needing a remeasure.
+private struct DynamicBar: View {
+    let fraction: Double
+    let tint: Color
+    var minimumVisibleFraction: Double = 0.08
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: DS.Radius.chip)
+                .fill(DS.Color.surfaceSecondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            RoundedRectangle(cornerRadius: DS.Radius.chip)
+                .fill(tint)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .scaleEffect(x: max(fraction, minimumVisibleFraction), y: 1, anchor: .leading)
+        }
     }
 }
 
@@ -610,11 +628,10 @@ private struct BusiestWeekdayCard: View {
                             .font(DS.Font.meta)
                             .foregroundStyle(DS.Color.textTertiary)
                             .frame(width: 30, alignment: .leading)
-                        GeometryReader { geo in
-                            RoundedRectangle(cornerRadius: DS.Radius.chip)
-                                .fill(day.fraction >= 0.999 ? DS.Color.warning : DS.Color.warning.opacity(0.35))
-                                .frame(width: max(geo.size.width * day.fraction, 4))
-                        }
+                        DynamicBar(
+                            fraction: day.fraction,
+                            tint: day.fraction >= 0.999 ? DS.Color.warning : DS.Color.warning.opacity(0.35)
+                        )
                         .frame(height: 14)
                     }
                 }
