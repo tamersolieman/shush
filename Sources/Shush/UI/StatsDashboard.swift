@@ -210,7 +210,7 @@ private struct StatCard<Content: View>: View {
     var body: some View {
         VStack(alignment: alignment, spacing: DS.Space.base) { content }
             .padding(DS.Space.wide)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.card))
     }
 }
@@ -376,50 +376,65 @@ private struct DesktopUsageCard: View {
                     .font(DS.Font.label)
                     .foregroundStyle(DS.Color.textSecondary)
             } else {
-                VStack(spacing: DS.Space.base) {
+                // A `Grid`, not a `VStack` of independent rows: each column (icon, bar,
+                // count, name) sizes to its widest cell and lines up across every row —
+                // a plain HStack per row can't share column widths with its siblings.
+                Grid(alignment: .leading, horizontalSpacing: DS.Space.base, verticalSpacing: DS.Space.base) {
                     ForEach(Array(usage.prefix(6).enumerated()), id: \.element.id) { index, app in
-                        AppUsageRow(app: app, shade: Self.shades[min(index, Self.shades.count - 1)])
+                        GridRow {
+                            usageCells(app: app, shade: Self.shades[min(index, Self.shades.count - 1)])
+                        }
                     }
                 }
             }
         }
     }
+
+    /// `Group` here isn't decorative — inside a `GridRow` it splices its children in as
+    /// separate cells rather than one, which is what lets this be factored out at all.
+    @ViewBuilder
+    private func usageCells(app: AppUsage, shade: Double) -> some View {
+        AppIcon(bundleID: app.bundleID)
+            .frame(width: 20, height: 20)
+
+        UsageBar(app: app, shade: shade)
+
+        Text("\(app.runCount) ·")
+            .font(DS.Font.semibold(11))
+            .foregroundStyle(DS.Color.textPrimary)
+            .gridColumnAlignment(.trailing)
+
+        Text(app.name)
+            .font(DS.Font.semibold(11))
+            .foregroundStyle(DS.Color.textPrimary)
+            .lineLimit(1)
+    }
 }
 
-private struct AppUsageRow: View {
+private struct UsageBar: View {
     let app: AppUsage
     let shade: Double
 
     private var percentText: String { "\(Int((app.fraction * 100).rounded()))%" }
 
     var body: some View {
-        HStack(spacing: DS.Space.base) {
-            AppIcon(bundleID: app.bundleID)
-                .frame(width: 20, height: 20)
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: DS.Radius.chip)
-                        .fill(DS.Color.surfaceSecondary)
-                    RoundedRectangle(cornerRadius: DS.Radius.chip)
-                        .fill(DS.Color.primary.opacity(shade))
-                        .frame(width: max(geo.size.width * app.fraction, 40))
-                        .overlay(alignment: .trailing) {
-                            Text(percentText)
-                                .font(DS.Font.semibold(11))
-                                .foregroundStyle(.white)
-                                .padding(.trailing, DS.Space.snug)
-                        }
-                }
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: DS.Radius.chip)
+                    .fill(DS.Color.surfaceSecondary)
+                RoundedRectangle(cornerRadius: DS.Radius.chip)
+                    .fill(DS.Color.primary.opacity(shade))
+                    .frame(width: max(geo.size.width * app.fraction, 40))
+                    .overlay(alignment: .trailing) {
+                        Text(percentText)
+                            .font(DS.Font.semibold(11))
+                            .foregroundStyle(.white)
+                            .padding(.trailing, DS.Space.snug)
+                    }
             }
-            .frame(height: 28)
-
-            Text("\(app.runCount) · \(app.name)")
-                .font(DS.Font.semibold(11))
-                .foregroundStyle(DS.Color.textPrimary)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
         }
+        .frame(height: 28)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -456,7 +471,21 @@ private struct StreakCard: View {
     let stats: DictationStats
 
     @State private var page = 0
-    private let weeksSpanned = 20
+    /// Width available to the grid, excluding the page-arrow gutters either side —
+    /// measured live so the number of weeks shown adapts to the card's actual width.
+    @State private var gridWidth: CGFloat = 0
+
+    private let cell: CGFloat = 15
+    private let spacing: CGFloat = 4
+    private let gutter: CGFloat = 38
+
+    /// However many weeks fit at a fixed, GitHub-style cell size — filling the card by
+    /// showing more history rather than blowing up individual squares.
+    private var weeksSpanned: Int {
+        guard gridWidth > 0 else { return 20 }
+        let weeks = Int((gridWidth - gutter + spacing) / (cell + spacing))
+        return max(8, weeks)
+    }
 
     private var streak: StreakInfo { stats.streak(page: page, weeksSpanned: weeksSpanned) }
 
@@ -473,8 +502,16 @@ private struct StreakCard: View {
             HStack(alignment: .top, spacing: DS.Space.snug) {
                 PageButton(systemName: "chevron.left", enabled: streak.canGoOlder) { page += 1 }
 
-                StreakGrid(streak: streak, weeksSpanned: weeksSpanned)
-                    .frame(maxWidth: .infinity)
+                // `Color.clear` has no intrinsic size and genuinely fills whatever this
+                // slot is offered; `StreakGrid` itself hugs its (fixed-size) content, so
+                // measuring the grid directly would never see more than what it just
+                // drew. This sizer sits behind it purely to report the true slot width.
+                ZStack(alignment: .topLeading) {
+                    Color.clear
+                    StreakGrid(streak: streak, weeksSpanned: weeksSpanned, cell: cell, spacing: spacing, gutter: gutter)
+                }
+                .frame(maxWidth: .infinity)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { gridWidth = $0 }
 
                 PageButton(systemName: "chevron.right", enabled: page > 0) { page -= 1 }
             }
@@ -525,10 +562,9 @@ private struct PageButton: View {
 private struct StreakGrid: View {
     let streak: StreakInfo
     let weeksSpanned: Int
-
-    private let cell: CGFloat = 13
-    private let spacing: CGFloat = 3
-    private let gutter: CGFloat = 26
+    let cell: CGFloat
+    let spacing: CGFloat
+    let gutter: CGFloat
 
     private var maxCount: Int {
         max(streak.columns.flatMap { $0 }.compactMap { $0?.count }.max() ?? 1, 1)
@@ -557,6 +593,7 @@ private struct StreakGrid: View {
                             .font(DS.Font.meta)
                             .foregroundStyle(DS.Color.textTertiary)
                             .frame(width: gutter - spacing, height: cell, alignment: .leading)
+                            .fixedSize()
                     }
                 }
 
