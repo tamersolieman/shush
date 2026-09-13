@@ -1,11 +1,12 @@
 import AppKit
 import SwiftUI
 
-/// The app's usage dashboard — words/minute, dictionary fixes, totals, per-app breakdown,
-/// and a streak calendar. Computed from `LifetimeStatsStore`, a running tally that's
-/// independent of `RunLog`'s own history — so History Limit, Auto-Delete Recordings, and
-/// manual deletes never make these numbers go backwards. Nothing here is benchmarked
-/// against other users, because Shush only ever sees this machine.
+/// The app's usage dashboard — a KPI strip, monthly trend, desktop usage, correction
+/// accuracy, busiest weekday, and a streak calendar. Computed from `LifetimeStatsStore`, a
+/// running tally that's independent of `RunLog`'s own history — so History Limit,
+/// Auto-Delete Recordings, and manual deletes never make these numbers go backwards.
+/// Nothing here is benchmarked against other users, because Shush only ever sees this
+/// machine.
 struct StatsDashboard: View {
     @State private var lifetimeStore = LifetimeStatsStore.shared
     // `merged`: this device's totals plus every synced device's last-pushed snapshot. Equals
@@ -19,12 +20,21 @@ struct StatsDashboard: View {
                     EmptyPage(title: "No stats yet", detail: "Dictate something — the numbers fill in from there.")
                         .frame(minHeight: 300)
                 } else {
-                    HStack(alignment: .top, spacing: DS.Space.section) {
-                        WordsPerMinuteCard(wpm: stats.wordsPerMinute)
-                        FixesCard(stats: stats)
-                        TotalWordsCard(stats: stats)
+                    KPIStrip(stats: stats)
+
+                    HStack(alignment: .top, spacing: DS.Space.roomy) {
+                        VStack(spacing: DS.Space.roomy) {
+                            MonthlyTrendCard(stats: stats)
+                            DesktopUsageCard(usage: stats.appUsage)
+                        }
+                        VStack(spacing: DS.Space.roomy) {
+                            CorrectionAccuracyCard(stats: stats)
+                            DictionaryFixesCard(stats: stats)
+                            BusiestWeekdayCard(stats: stats)
+                        }
+                        .frame(width: 340)
                     }
-                    DesktopUsageCard(usage: stats.appUsage)
+
                     StreakCard(stats: stats)
                 }
             }
@@ -68,6 +78,21 @@ private struct StreakInfo {
     let canGoOlder: Bool
 }
 
+private struct MonthPoint: Identifiable {
+    var id: String { key }
+    let key: String
+    let label: String
+    let words: Int
+    let fraction: Double
+}
+
+private struct WeekdayCount: Identifiable {
+    var id: String { label }
+    let label: String
+    let count: Int
+    let fraction: Double
+}
+
 private struct DictationStats {
     let stats: LifetimeStats
 
@@ -96,6 +121,28 @@ private struct DictationStats {
         return (Double(thisMonth) - Double(lastMonth)) / Double(lastMonth) * 100
     }
 
+    /// "14.2h", or minutes once under an hour — total time spent dictating, lifetime.
+    var totalTimeFormatted: String {
+        let hours = stats.totalAudioSeconds / 3600
+        if hours >= 1 { return String(format: "%.1fh", hours) }
+        return "\(max(Int(stats.totalAudioSeconds / 60), 0))m"
+    }
+
+    /// Rough per-session average — `totalRuns` includes comparison runs (which inject no
+    /// words), so this slightly undercounts true injected-run averages rather than needing a
+    /// second tally just for this one number.
+    var avgWordsPerSession: Int {
+        guard stats.totalRuns > 0 else { return 0 }
+        return Int((Double(stats.totalWords) / Double(stats.totalRuns)).rounded())
+    }
+
+    /// Share of dictated words the dictionary had to auto-correct — the inverse of this is
+    /// shown as "accuracy".
+    var correctionRatePercent: Double {
+        guard stats.totalWords > 0 else { return 0 }
+        return Double(stats.wordsCorrected) / Double(stats.totalWords) * 100
+    }
+
     var appUsage: [AppUsage] {
         let tallies = Array(stats.appTallies.values)
         guard !tallies.isEmpty else { return [] }
@@ -109,6 +156,38 @@ private struct DictationStats {
             )
         }
         .sorted { $0.runCount > $1.runCount }
+    }
+
+    /// The last 6 calendar months' word counts, oldest first, each normalized against the
+    /// tallest month in the window for bar heights.
+    var monthlyTrend: [MonthPoint] {
+        let calendar = Calendar.current
+        let now = Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM"
+
+        let points: [(key: String, label: String, words: Int)] = (0...5).reversed().compactMap { offset in
+            guard let date = calendar.date(byAdding: .month, value: -offset, to: now) else { return nil }
+            let key = LifetimeStatsStore.monthKey(date, calendar: calendar)
+            return (key, formatter.string(from: date), stats.monthWords[key] ?? 0)
+        }
+        let maxWords = max(points.map(\.words).max() ?? 1, 1)
+        return points.map { MonthPoint(key: $0.key, label: $0.label, words: $0.words, fraction: Double($0.words) / Double(maxWords)) }
+    }
+
+    /// Every recorded day's count, bucketed by weekday (Monday first) and summed across all
+    /// history — which day of the week you tend to dictate most.
+    var busiestWeekdays: [WeekdayCount] {
+        let calendar = Calendar.current
+        var totals = [Int](repeating: 0, count: 7) // Mon = 0 ... Sun = 6
+        for (key, count) in stats.dayCounts {
+            guard let date = LifetimeStatsStore.date(fromDayKey: key, calendar: calendar) else { continue }
+            let sundayFirst = calendar.component(.weekday, from: date) - 1 // Sun = 0
+            totals[(sundayFirst + 6) % 7] += count
+        }
+        let maxTotal = max(totals.max() ?? 1, 1)
+        let labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        return (0..<7).map { WeekdayCount(label: labels[$0], count: totals[$0], fraction: Double(totals[$0]) / Double(maxTotal)) }
     }
 
     /// GitHub-style streak: every calendar day in the visible window, how many recordings
@@ -203,7 +282,7 @@ private struct DictationStats {
     }
 }
 
-// MARK: - Cards
+// MARK: - Shared card pieces
 
 private struct StatCard<Content: View>: View {
     var alignment: HorizontalAlignment = .leading
@@ -217,144 +296,137 @@ private struct StatCard<Content: View>: View {
     }
 }
 
-private struct CardDivider: View {
+/// A colored square behind an SF Symbol — every card and KPI tile leads with one of these so
+/// the dashboard reads as a set of distinct metrics at a glance, not a wall of numbers.
+private struct IconChip: View {
+    let systemName: String
+    let tint: Color
+    var size: CGFloat = 40
+
     var body: some View {
-        Rectangle().fill(DS.Color.divider).frame(height: DS.Border.hairline)
+        ZStack {
+            RoundedRectangle(cornerRadius: DS.Radius.control + 2)
+                .fill(tint.opacity(0.15))
+            Image(systemName: systemName)
+                .font(.system(size: size * 0.45, weight: .semibold))
+                .foregroundStyle(tint)
+        }
+        .frame(width: size, height: size)
     }
 }
 
-private struct MetricTitle: View {
-    let text: String
-    var body: some View {
-        Text(text).font(DS.Font.metricTitle).foregroundStyle(DS.Color.textPrimary)
-    }
-}
-
-/// Small tracked all-caps label — "TOTAL APPS USED | 36" style, top-right of a card.
-private struct CapsLabel: View {
-    let text: String
-    init(_ text: String) { self.text = text }
+/// A card's title row: icon chip + label, the same shape on every card in the second row.
+private struct CardHeader: View {
+    let icon: String
+    let tint: Color
+    let title: String
 
     var body: some View {
-        Text(text.uppercased())
-            .font(DS.Font.sectionHeader)
-            .foregroundStyle(DS.Color.textTertiary)
-            .kerning(0.4)
-    }
-}
-
-private struct MetricSubtitle: View {
-    let text: String
-    var body: some View {
-        Text(text).font(DS.Font.metricSubtitle).foregroundStyle(DS.Color.textTertiary)
-    }
-}
-
-private struct WordsPerMinuteCard: View {
-    let wpm: Double
-    /// Visual ceiling for the arc — comfortably above fast conversational speech.
-    private let scaleMax: Double = 200
-
-    var body: some View {
-        StatCard {
-            Text(wpm > 0 ? "\(Int(wpm.rounded()))" : "—")
-                .font(DS.Font.metricValue)
-                .foregroundStyle(DS.Color.primary)
-            MetricTitle(text: "Words per minute")
-
-            GaugeArc(fraction: min(wpm / scaleMax, 1))
-                .frame(height: 90)
-                .frame(maxWidth: .infinity)
+        HStack(spacing: DS.Space.snug) {
+            IconChip(systemName: icon, tint: tint, size: 32)
+            Text(title).font(DS.Font.label).foregroundStyle(DS.Color.textPrimary)
         }
     }
 }
 
-/// A semicircular progress arc.
-private struct GaugeArc: View {
-    let fraction: Double
+// MARK: - KPI strip
 
-    var body: some View {
-        Canvas { context, size in
-            let pivot = CGPoint(x: size.width / 2, y: size.height)
-            let radius = min(size.width / 2, size.height) - 6
-
-            var track = Path()
-            track.addArc(center: pivot, radius: radius, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
-            context.stroke(track, with: .color(DS.Color.surfaceSecondary), style: StrokeStyle(lineWidth: 10, lineCap: .round))
-
-            var progress = Path()
-            let end = 180 - 180 * fraction
-            progress.addArc(center: pivot, radius: radius, startAngle: .degrees(180), endAngle: .degrees(end), clockwise: false)
-            context.stroke(progress, with: .color(DS.Color.primary), style: StrokeStyle(lineWidth: 10, lineCap: .round))
-        }
-    }
-}
-
-private struct FixesCard: View {
+private struct KPIStrip: View {
     let stats: DictationStats
 
     var body: some View {
-        StatCard {
-            Text("\(stats.dictionaryFixes)")
-                .font(DS.Font.metricValue)
-                .foregroundStyle(DS.Color.primary)
-            MetricTitle(text: "Dictionary fixes")
+        HStack(spacing: DS.Space.roomy) {
+            KPITile(
+                icon: "doc.text.fill", tint: DS.Color.primary,
+                value: stats.totalWords.formatted(), label: "Total Words",
+                sub: trendSubtitle, subColor: trendColor
+            )
+            KPITile(
+                icon: "gauge.with.dots.needle.67percent", tint: DS.Color.purple,
+                value: stats.wordsPerMinute > 0 ? "\(Int(stats.wordsPerMinute.rounded()))" : "—", label: "Words / Min",
+                sub: "avg \(stats.avgWordsPerSession) / session"
+            )
+            KPITile(
+                icon: "clock.fill", tint: DS.Color.warning,
+                value: stats.totalTimeFormatted, label: "Total Time",
+                sub: "\(stats.stats.totalRuns.formatted()) sessions"
+            )
+            KPITile(
+                icon: "flame.fill", tint: DS.Color.rose,
+                value: "\(stats.streak(page: 0).current)", label: "Day Streak",
+                sub: "best \(stats.streak(page: 0).longest) days"
+            )
+            KPITile(
+                icon: "wand.and.stars", tint: DS.Color.success,
+                value: String(format: "%.1f%%", stats.correctionRatePercent), label: "Correction Rate",
+                sub: "\(stats.dictionaryFixes) fixes"
+            )
+        }
+    }
 
-            CardDivider()
+    private var trendSubtitle: String {
+        guard let trend = stats.monthOverMonth else { return "this month" }
+        return "\(trend >= 0 ? "↑" : "↓") \(abs(Int(trend.rounded())))% this month"
+    }
 
-            VStack(alignment: .leading, spacing: DS.Space.tight) {
-                MetricSubtitle(text: "\(stats.wordsCorrected) words corrected")
-                MetricSubtitle(text: "\(stats.dictionaryFixes) correction rules fired")
+    private var trendColor: Color { (stats.monthOverMonth ?? 0) >= 0 ? DS.Color.success : DS.Color.danger }
+}
+
+private struct KPITile: View {
+    let icon: String
+    let tint: Color
+    let value: String
+    let label: String
+    let sub: String
+    var subColor: Color = DS.Color.textTertiary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.snug) {
+            IconChip(systemName: icon, tint: tint)
+            Text(value).font(DS.Font.bold(24)).foregroundStyle(DS.Color.textPrimary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).font(DS.Font.metricSubtitle).foregroundStyle(DS.Color.textSecondary)
+                Text(sub).font(.system(size: 10, weight: .semibold)).foregroundStyle(subColor)
             }
         }
+        .padding(DS.Space.wide)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.card))
     }
 }
 
-private struct TotalWordsCard: View {
-    let stats: DictationStats
+// MARK: - Monthly trend
 
-    private var books: Int { stats.totalWords / 90_000 }
+private struct MonthlyTrendCard: View {
+    let stats: DictationStats
 
     var body: some View {
         StatCard {
-            HStack(alignment: .top) {
-                Text(stats.totalWords.formatted())
-                    .font(DS.Font.metricValue)
-                    .foregroundStyle(DS.Color.primary)
-                Spacer()
-                if let trend = stats.monthOverMonth {
-                    TrendBadge(percent: trend)
+            CardHeader(icon: "chart.bar.fill", tint: DS.Color.primary, title: "Monthly words dictated")
+
+            HStack(alignment: .bottom, spacing: DS.Space.roomy) {
+                ForEach(stats.monthlyTrend) { point in
+                    VStack(spacing: DS.Space.tight) {
+                        Text(point.words.formatted())
+                            .font(.system(size: 10))
+                            .foregroundStyle(DS.Color.textTertiary)
+                        RoundedRectangle(cornerRadius: DS.Radius.chip)
+                            .fill(point.fraction >= 0.999 ? DS.Color.primary : DS.Color.primary.opacity(0.35))
+                            .frame(height: max(point.fraction * 130, 4))
+                        Text(point.label)
+                            .font(DS.Font.meta)
+                            .foregroundStyle(point.fraction >= 0.999 ? DS.Color.primary : DS.Color.textTertiary)
+                            .fontWeight(point.fraction >= 0.999 ? .semibold : .regular)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
             }
-            MetricTitle(text: "Total words dictated")
-
-            CardDivider()
-
-            Text(books > 0
-                 ? "You've written \(books) complete book\(books == 1 ? "" : "s")!"
-                 : "Keep going — \(90_000 - stats.totalWords) words to your first book.")
-                .font(DS.Font.metricSubtitle)
-                .foregroundStyle(DS.Color.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            .frame(height: 170)
         }
     }
 }
 
-private struct TrendBadge: View {
-    let percent: Double
-
-    var body: some View {
-        HStack(spacing: DS.Space.hair) {
-            Image(systemName: percent >= 0 ? "arrow.up.right" : "arrow.down.right")
-            Text("\(abs(Int(percent.rounded())))% this month")
-        }
-        .font(DS.Font.meta)
-        .foregroundStyle(percent >= 0 ? DS.Color.success : DS.Color.danger)
-        .padding(.horizontal, DS.Space.snug)
-        .padding(.vertical, DS.Space.hair)
-        .background((percent >= 0 ? DS.Color.success : DS.Color.danger).opacity(0.12), in: .capsule)
-    }
-}
+// MARK: - Desktop usage
 
 private struct DesktopUsageCard: View {
     let usage: [AppUsage]
@@ -365,12 +437,10 @@ private struct DesktopUsageCard: View {
 
     var body: some View {
         StatCard {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Desktop usage")
-                    .font(DS.Font.streakNumber)
-                    .foregroundStyle(DS.Color.textPrimary)
+            HStack {
+                CardHeader(icon: "macwindow", tint: DS.Color.purple, title: "Desktop usage")
                 Spacer()
-                CapsLabel("Total apps used | \(usage.count)")
+                Text("\(usage.count) apps").font(DS.Font.meta).foregroundStyle(DS.Color.textTertiary)
             }
 
             if usage.isEmpty {
@@ -396,8 +466,11 @@ private struct DesktopUsageCard: View {
     /// separate cells rather than one, which is what lets this be factored out at all.
     @ViewBuilder
     private func usageCells(app: AppUsage, shade: Double) -> some View {
-        AppIcon(bundleID: app.bundleID)
-            .frame(width: 20, height: 20)
+        ZStack {
+            Circle().fill(DS.Color.primary.opacity(shade * 0.18))
+            AppIcon(bundleID: app.bundleID).frame(width: 16, height: 16)
+        }
+        .frame(width: 26, height: 26)
 
         UsageBar(app: app, shade: shade)
 
@@ -469,6 +542,89 @@ private final class AppIconCache {
     }
 }
 
+// MARK: - Correction accuracy / fixes / busiest weekday
+
+private struct CorrectionAccuracyCard: View {
+    let stats: DictationStats
+
+    private var accuracyPercent: Double { 100 - stats.correctionRatePercent }
+    private var accuracyFraction: Double { max(min(accuracyPercent / 100, 1), 0) }
+
+    var body: some View {
+        StatCard {
+            CardHeader(icon: "checkmark.shield.fill", tint: DS.Color.success, title: "Correction accuracy")
+
+            HStack(spacing: DS.Space.roomy) {
+                ZStack {
+                    Circle().stroke(DS.Color.success.opacity(0.15), lineWidth: 10)
+                    Circle()
+                        .trim(from: 0, to: accuracyFraction)
+                        .stroke(DS.Color.success, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
+                .frame(width: 72, height: 72)
+
+                VStack(alignment: .leading, spacing: DS.Space.tight) {
+                    Text(String(format: "%.1f%%", accuracyPercent))
+                        .font(DS.Font.bold(22))
+                        .foregroundStyle(DS.Color.textPrimary)
+                    Text("\(stats.wordsCorrected.formatted()) of \(stats.totalWords.formatted()) words auto-corrected")
+                        .font(DS.Font.meta)
+                        .foregroundStyle(DS.Color.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+}
+
+private struct DictionaryFixesCard: View {
+    let stats: DictationStats
+
+    var body: some View {
+        HStack(spacing: DS.Space.roomy) {
+            IconChip(systemName: "wand.and.stars", tint: DS.Color.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(stats.dictionaryFixes)").font(DS.Font.bold(22)).foregroundStyle(DS.Color.textPrimary)
+                Text("Correction rules fired").font(DS.Font.metricSubtitle).foregroundStyle(DS.Color.textSecondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(DS.Space.wide)
+        .frame(maxWidth: .infinity)
+        .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.card))
+    }
+}
+
+private struct BusiestWeekdayCard: View {
+    let stats: DictationStats
+
+    var body: some View {
+        StatCard {
+            CardHeader(icon: "calendar", tint: DS.Color.warning, title: "Busiest day of week")
+
+            VStack(spacing: DS.Space.snug) {
+                ForEach(stats.busiestWeekdays) { day in
+                    HStack(spacing: DS.Space.snug) {
+                        Text(day.label)
+                            .font(DS.Font.meta)
+                            .foregroundStyle(DS.Color.textTertiary)
+                            .frame(width: 30, alignment: .leading)
+                        GeometryReader { geo in
+                            RoundedRectangle(cornerRadius: DS.Radius.chip)
+                                .fill(day.fraction >= 0.999 ? DS.Color.warning : DS.Color.warning.opacity(0.35))
+                                .frame(width: max(geo.size.width * day.fraction, 4))
+                        }
+                        .frame(height: 14)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Streak
+
 private struct StreakCard: View {
     let stats: DictationStats
 
@@ -493,12 +649,13 @@ private struct StreakCard: View {
 
     var body: some View {
         StatCard {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(streak.current) day streak")
-                    .font(DS.Font.streakNumber)
-                    .foregroundStyle(DS.Color.textPrimary)
+            HStack {
+                CardHeader(icon: "flame.fill", tint: DS.Color.rose, title: "\(streak.current) day streak")
                 Spacer()
-                CapsLabel("Longest streak | \(streak.longest) days")
+                Text("Longest streak | \(streak.longest) days")
+                    .font(DS.Font.sectionHeader)
+                    .foregroundStyle(DS.Color.textTertiary)
+                    .kerning(0.4)
             }
 
             HStack(alignment: .top, spacing: DS.Space.snug) {
@@ -523,7 +680,7 @@ private struct StreakCard: View {
                     Text("More").font(DS.Font.meta).foregroundStyle(DS.Color.textTertiary)
                     ForEach(0..<4) { level in
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(DS.Color.primary.opacity(intensity(for: level)))
+                            .fill(DS.Color.rose.opacity(intensity(for: level)))
                             .frame(width: 12, height: 12)
                     }
                     Text("Less").font(DS.Font.meta).foregroundStyle(DS.Color.textTertiary)
@@ -531,7 +688,7 @@ private struct StreakCard: View {
                 Spacer()
                 HStack(spacing: DS.Space.tight) {
                     RoundedRectangle(cornerRadius: 2)
-                        .strokeBorder(DS.Color.primary, lineWidth: 1.5)
+                        .strokeBorder(DS.Color.rose, lineWidth: 1.5)
                         .frame(width: 12, height: 12)
                     Text("Current streak").font(DS.Font.meta).foregroundStyle(DS.Color.textTertiary)
                 }
@@ -623,7 +780,7 @@ private struct StreakGrid: View {
             .overlay {
                 if let day, streak.currentStreakDates.contains(day.date) {
                     RoundedRectangle(cornerRadius: 2)
-                        .strokeBorder(DS.Color.primary, lineWidth: 1.5)
+                        .strokeBorder(DS.Color.rose, lineWidth: 1.5)
                 }
             }
     }
@@ -631,6 +788,6 @@ private struct StreakGrid: View {
     private func color(for day: StreakDay?) -> Color {
         guard let day, day.count > 0 else { return DS.Color.surfaceSecondary }
         let intensity = min(Double(day.count) / Double(maxCount), 1.0)
-        return DS.Color.primary.opacity(0.25 + intensity * 0.75)
+        return DS.Color.rose.opacity(0.25 + intensity * 0.75)
     }
 }

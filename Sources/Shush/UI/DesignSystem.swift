@@ -41,6 +41,10 @@ enum DS {
         static let success = SwiftUI.Color(hex: 0x22C55E)
         static let warning = SwiftUI.Color(hex: 0xF59E0B)
         static let danger = SwiftUI.Color(hex: 0xEF4444)
+        /// Two extra accents, dashboard-only — distinguishing five-plus metric tiles at a
+        /// glance needs more hues than the four semantic colors above cover.
+        static let purple = SwiftUI.Color(hex: 0x8B5CF6)
+        static let rose = SwiftUI.Color(hex: 0xF43F5E)
 
         /// Resolves to the light or dark value for whatever appearance is actually active —
         /// the window's, not necessarily `NSApp`'s, so `.preferredColorScheme` overrides work.
