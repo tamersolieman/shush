@@ -6,25 +6,46 @@ import Speech
 import SwiftUI
 
 /// Settings, embedded both as a sidebar page in the main window and — for the standard
-/// ⌘, shortcut — its own window. Matches the Pencil design: section header, thin divider,
-/// flat rows (label left, value/chevron or a toggle right), no card chrome.
+/// ⌘, shortcut — its own window. Each section is its own collapsible card (background,
+/// border, tappable header) rather than a flat run of rows, so a screen with this many
+/// sections stays scannable instead of blurring into one long list.
 struct SettingsPageView: View {
     @Bindable var controller: DictationController
     @State private var settings = Settings.shared
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                AccountSection(settings: settings)
-                AppearanceSection(settings: settings)
-                DictationSection(controller: controller, settings: settings)
-                SpeechRecognitionSection(settings: settings)
-                TranscriptionSection(settings: settings)
-                AudioSection(settings: settings)
-                ModelSection(settings: settings)
-                CleanupSection(settings: settings)
-                HistorySection(settings: settings)
-                AboutSection(settings: settings)
+            VStack(alignment: .leading, spacing: DS.Space.base) {
+                CollapsibleSection(title: "Account", id: "account") {
+                    AccountSection(settings: settings)
+                }
+                CollapsibleSection(title: "Appearance", id: "appearance") {
+                    AppearanceSection(settings: settings)
+                }
+                CollapsibleSection(title: "Dictation", id: "dictation") {
+                    DictationSection(controller: controller, settings: settings)
+                }
+                CollapsibleSection(title: "Speech Recognition", id: "speechRecognition") {
+                    SpeechRecognitionSection(settings: settings)
+                }
+                CollapsibleSection(title: "Transcription", id: "transcription") {
+                    TranscriptionSection(settings: settings)
+                }
+                CollapsibleSection(title: "Audio", id: "audio") {
+                    AudioSection(settings: settings)
+                }
+                CollapsibleSection(title: "Model", id: "model") {
+                    ModelSection(settings: settings)
+                }
+                CollapsibleSection(title: "Cleanup", id: "cleanup") {
+                    CleanupSection(settings: settings)
+                }
+                CollapsibleSection(title: "History", id: "history") {
+                    HistorySection(settings: settings)
+                }
+                CollapsibleSection(title: "About", id: "about") {
+                    AboutSection(settings: settings)
+                }
             }
             .padding(DS.Space.panel)
         }
@@ -48,15 +69,54 @@ struct SettingsWindow: View {
 
 // MARK: - Shared row scaffolding
 
-private struct SectionHeader: View {
+/// A collapsible, highlighted card for one settings section — background, border, and a
+/// tappable header (title + chevron) that toggles the body. Expansion state persists per
+/// section across launches (`@AppStorage`), defaulting to expanded so nothing looks hidden the
+/// first time someone opens Settings.
+private struct CollapsibleSection<Content: View>: View {
     let title: String
+    @ViewBuilder var content: Content
+    @AppStorage private var isExpanded: Bool
+
+    init(title: String, id: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+        self._isExpanded = AppStorage(wrappedValue: true, "settingsSectionExpanded.\(id)")
+    }
+
     var body: some View {
-        Text(title.uppercased())
-            .font(DS.Font.sectionHeader)
-            .foregroundStyle(DS.Color.textTertiary)
-            .padding(.top, DS.Space.section)
-            .padding(.bottom, DS.Space.snug)
-        Rectangle().fill(DS.Color.divider).frame(height: DS.Border.hairline)
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(DS.Motion.fast) { isExpanded.toggle() }
+            } label: {
+                HStack(spacing: DS.Space.snug) {
+                    Text(title.uppercased())
+                        .font(DS.Font.sectionHeader)
+                        .foregroundStyle(DS.Color.textPrimary)
+                    Spacer(minLength: DS.Space.roomy)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(DS.Color.textSecondary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }
+                .padding(.horizontal, DS.Space.base)
+                .frame(height: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                CardDivider()
+                VStack(alignment: .leading, spacing: 0) {
+                    content
+                }
+            }
+        }
+        .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.Radius.card)
+                .strokeBorder(DS.Color.border, lineWidth: DS.Border.hairline)
+        )
     }
 }
 
@@ -124,8 +184,6 @@ private struct AppearanceSection: View {
     @Bindable var settings: Settings
 
     var body: some View {
-        SectionHeader(title: "Appearance")
-
         SettingsRow(title: "Theme") {
             Menu {
                 ForEach(AppearanceMode.allCases, id: \.self) { mode in
@@ -157,8 +215,6 @@ private struct DictationSection: View {
     @State private var isRecording = false
 
     var body: some View {
-        SectionHeader(title: "Dictation")
-
         SettingsRow(title: "Transcribe Shortcut") {
             HStack(spacing: DS.Space.snug) {
                 Button {
@@ -219,8 +275,6 @@ private struct SpeechRecognitionSection: View {
     }
 
     var body: some View {
-        SectionHeader(title: "Speech Recognition")
-
         SettingsRow(title: "Language") {
             HStack(spacing: DS.Space.snug) {
                 if settings.engine == .cohere {
@@ -280,8 +334,6 @@ private struct TranscriptionSection: View {
     @State private var newWord = ""
 
     var body: some View {
-        SectionHeader(title: "Transcription")
-
         ToggleRow(title: "Voice Activity Detection", isOn: $settings.vadEnabled)
         RowSubtitle(
             "Filter silence from recordings. Streaming-capable models use a longer VAD "
@@ -356,8 +408,6 @@ private struct AudioSection: View {
     }
 
     var body: some View {
-        SectionHeader(title: "Audio")
-
         SettingsRow(title: "Microphone") {
             HStack(spacing: DS.Space.snug) {
                 Menu {
@@ -398,8 +448,6 @@ private struct ModelSection: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        SectionHeader(title: "Model")
-
         SettingsRow(title: "Speech Engine") {
             Menu {
                 ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
@@ -474,8 +522,6 @@ private struct CleanupSection: View {
     @Bindable var settings: Settings
 
     var body: some View {
-        SectionHeader(title: "Cleanup")
-
         ToggleRow(title: "Clean Up Transcripts", isOn: $settings.cleanupEnabled)
 
         HStack {
@@ -496,8 +542,6 @@ private struct HistorySection: View {
     @Bindable var settings: Settings
 
     var body: some View {
-        SectionHeader(title: "History")
-
         SettingsRow(title: "History Limit") {
             HStack(spacing: DS.Space.snug) {
                 Stepper(value: $settings.historyLimit, in: 1...1000) {
@@ -561,8 +605,6 @@ private struct AccountSection: View {
     @State private var isConnecting = false
 
     var body: some View {
-        SectionHeader(title: "Account")
-
         if let email = settings.googleAccountEmail {
             SettingsRow(title: "Signed In") {
                 Text(email)
@@ -629,8 +671,6 @@ private struct AboutSection: View {
     }
 
     var body: some View {
-        SectionHeader(title: "About")
-
         // No localization exists yet — English is the only option, kept here as the slot
         // this setting will live in once Shush ships more than one language.
         SettingsRow(title: "Application Language") {
