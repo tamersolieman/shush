@@ -85,6 +85,22 @@ final class DictionaryStore {
 
     var biasPhrases: [String] { DictionaryCorrector.biasPhrases(from: entries) }
 
+    /// The file's modification time, for `SyncEngine`'s last-write-wins comparison against the
+    /// Drive copy's `updatedAt` — no separate stored timestamp needed, the filesystem already
+    /// has this.
+    var lastModified: Date {
+        (try? FileManager.default.attributesOfItem(atPath: Self.fileURL.path)[.modificationDate] as? Date) ?? .distantPast
+    }
+
+    /// Writes text pulled from Drive straight to disk, reusing the existing `isSaving` guard so
+    /// the file watcher doesn't mistake this for an external hand-edit and re-push it.
+    func applyRemote(text: String) {
+        isSaving = true
+        defer { isSaving = false }
+        try? text.write(to: Self.fileURL, atomically: true, encoding: .utf8)
+        load()
+    }
+
     // MARK: - Persistence
 
     private func load() {
@@ -131,6 +147,7 @@ final class DictionaryStore {
         let body = entries.map(\.fileLine).joined(separator: "\n")
         let text = Self.header + body + "\n"
         try? text.write(to: Self.fileURL, atomically: true, encoding: .utf8)
+        SyncEngine.shared.scheduleDictionaryPush()
     }
 
     private static let header = """

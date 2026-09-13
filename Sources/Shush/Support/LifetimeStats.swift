@@ -34,16 +34,35 @@ final class LifetimeStatsStore {
 
     private(set) var current: LifetimeStats
 
+    /// The dashboard's actual display value: `current` (this device's own totals) summed with
+    /// every other device's last-synced snapshot. Defaults to `current` until a pull ever
+    /// completes, so signed-out/never-synced behaves exactly as before this feature existed.
+    private(set) var merged: LifetimeStats
+
+    /// The most recent set of other-device snapshots downloaded by `SyncEngine`, kept around so
+    /// `record(_:)` can keep `merged` current between pulls without a network round trip.
+    private var lastRemoteDevices: [DeviceStatsPayload] = []
+
     private let defaults = UserDefaults.standard
     private let defaultsKey = "lifetimeStats"
 
     private init() {
+        let loaded: LifetimeStats
         if let data = defaults.data(forKey: defaultsKey),
            let decoded = try? JSONDecoder().decode(LifetimeStats.self, from: data) {
-            current = decoded
+            loaded = decoded
         } else {
-            current = LifetimeStats()
+            loaded = LifetimeStats()
         }
+        current = loaded
+        merged = loaded
+    }
+
+    /// Called by `SyncEngine` after downloading every device's stats file. Never writes back
+    /// into `current`/`UserDefaults` — the merge result is a view, not a new local total.
+    func applyMerged(remoteDevices: [DeviceStatsPayload]) {
+        lastRemoteDevices = remoteDevices
+        merged = Self.merge(local: current, selfDeviceID: DeviceID.value, remoteDevices: remoteDevices)
     }
 
     /// Folds one completed run into the lifetime totals. Call once per run, at the point
@@ -73,8 +92,10 @@ final class LifetimeStatsStore {
         }
 
         current = stats
+        merged = Self.merge(local: stats, selfDeviceID: DeviceID.value, remoteDevices: lastRemoteDevices)
         guard let data = try? JSONEncoder().encode(stats) else { return }
         defaults.set(data, forKey: defaultsKey)
+        SyncEngine.shared.scheduleStatsPush()
     }
 
     nonisolated static func dayKey(_ date: Date, calendar: Calendar) -> String {

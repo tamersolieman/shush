@@ -87,6 +87,7 @@ final class Settings {
         didSet {
             guard let data = try? JSONEncoder().encode(pushToTalkKey) else { return }
             defaults.set(data, forKey: Keys.pushToTalkKey)
+            markDirtyForSync()
         }
     }
 
@@ -94,32 +95,32 @@ final class Settings {
     /// once to start, press again to stop — the key's release is ignored either way, so
     /// switching this doesn't need a different key.
     var pushToTalkEnabled: Bool {
-        didSet { defaults.set(pushToTalkEnabled, forKey: Keys.pushToTalkEnabled) }
+        didSet { defaults.set(pushToTalkEnabled, forKey: Keys.pushToTalkEnabled); markDirtyForSync() }
     }
 
     var engine: SpeechEngineChoice {
-        didSet { defaults.set(engine.rawValue, forKey: Keys.engine) }
+        didSet { defaults.set(engine.rawValue, forKey: Keys.engine); markDirtyForSync() }
     }
 
     /// Run every engine on each recording and show them side by side, instead of
     /// transcribing with one. Nothing is typed into the focused app in this mode.
     var compareMode: Bool {
-        didSet { defaults.set(compareMode, forKey: Keys.compareMode) }
+        didSet { defaults.set(compareMode, forKey: Keys.compareMode); markDirtyForSync() }
     }
 
     /// Run the cleanup pass before injecting. Off = raw engine output.
     var cleanupEnabled: Bool {
-        didSet { defaults.set(cleanupEnabled, forKey: Keys.cleanupEnabled) }
+        didSet { defaults.set(cleanupEnabled, forKey: Keys.cleanupEnabled); markDirtyForSync() }
     }
 
     /// Use the on-device LLM for cleanup instead of the deterministic rule pass.
     var smartCleanup: Bool {
-        didSet { defaults.set(smartCleanup, forKey: Keys.smartCleanup) }
+        didSet { defaults.set(smartCleanup, forKey: Keys.smartCleanup); markDirtyForSync() }
     }
 
     /// Play a short tick when capture starts and stops.
     var soundEnabled: Bool {
-        didSet { defaults.set(soundEnabled, forKey: Keys.soundEnabled) }
+        didSet { defaults.set(soundEnabled, forKey: Keys.soundEnabled); markDirtyForSync() }
     }
 
     /// Filters silence out of the capture in real time. Streaming-capable engines (Apple)
@@ -127,31 +128,32 @@ final class Settings {
     /// them recognition context; batch engines can afford a shorter one. Off records raw,
     /// unfiltered audio.
     var vadEnabled: Bool {
-        didSet { defaults.set(vadEnabled, forKey: Keys.vadEnabled) }
+        didSet { defaults.set(vadEnabled, forKey: Keys.vadEnabled); markDirtyForSync() }
     }
 
     /// Strips hesitation words (um, uh, …) during cleanup. Independent of `cleanupEnabled`
     /// so a user who wants punctuation/spacing fixes but not filler removal can have both —
     /// though with cleanup off entirely, this has nothing to act on.
     var removeFillerWords: Bool {
-        didSet { defaults.set(removeFillerWords, forKey: Keys.removeFillerWords) }
+        didSet { defaults.set(removeFillerWords, forKey: Keys.removeFillerWords); markDirtyForSync() }
     }
 
     /// A BCP-47 identifier ("en-US", "es-ES", …), or "auto" for the system's current
     /// locale. Only `AppleSpeechEngine` honors this — Parakeet is English-only.
     var speechLanguage: String {
-        didSet { defaults.set(speechLanguage, forKey: Keys.speechLanguage) }
+        didSet { defaults.set(speechLanguage, forKey: Keys.speechLanguage); markDirtyForSync() }
     }
 
     /// Runs the transcript through on-device translation before injection. Only takes
     /// effect with a specific `speechLanguage` selected — translation needs a known source
     /// language, so it's a no-op while `speechLanguage` is "auto".
     var translateToEnglish: Bool {
-        didSet { defaults.set(translateToEnglish, forKey: Keys.translateToEnglish) }
+        didSet { defaults.set(translateToEnglish, forKey: Keys.translateToEnglish); markDirtyForSync() }
     }
 
     /// CoreAudio device UID of the chosen input, or nil for whatever macOS considers the
-    /// default input device.
+    /// default input device. Machine-local — deliberately excluded from sync, since another
+    /// Mac's device UID is meaningless here.
     var microphoneDeviceID: String? {
         didSet { defaults.set(microphoneDeviceID, forKey: Keys.microphoneDeviceID) }
     }
@@ -160,31 +162,60 @@ final class Settings {
     /// pick up whatever's playing. Restored the moment the recording ends, regardless of
     /// whether this is still on by then.
     var muteWhileRecording: Bool {
-        didSet { defaults.set(muteWhileRecording, forKey: Keys.muteWhileRecording) }
+        didSet { defaults.set(muteWhileRecording, forKey: Keys.muteWhileRecording); markDirtyForSync() }
     }
 
     /// Overrides the system appearance for Shush's own windows. `DS.Color` resolves per the
     /// window's actual drawn appearance, so this is enough to make every token switch —
     /// nothing else needs to know about it.
     var appearance: AppearanceMode {
-        didSet { defaults.set(appearance.rawValue, forKey: Keys.appearance) }
+        didSet { defaults.set(appearance.rawValue, forKey: Keys.appearance); markDirtyForSync() }
     }
 
     /// Oldest entries beyond this count are trimmed from `RunLog` whenever a new one is
     /// recorded.
     var historyLimit: Int {
-        didSet { defaults.set(historyLimit, forKey: Keys.historyLimit) }
+        didSet { defaults.set(historyLimit, forKey: Keys.historyLimit); markDirtyForSync() }
     }
 
     /// Entries older than this are purged from `RunLog` on the same schedule.
     var autoDeleteInterval: AutoDeleteInterval {
-        didSet { defaults.set(autoDeleteInterval.rawValue, forKey: Keys.autoDeleteInterval) }
+        didSet { defaults.set(autoDeleteInterval.rawValue, forKey: Keys.autoDeleteInterval); markDirtyForSync() }
     }
 
     /// Show release notes after an update. No changelog UI exists yet — this just holds the
     /// preference for when one does.
     var showWhatsNew: Bool {
-        didSet { defaults.set(showWhatsNew, forKey: Keys.showWhatsNew) }
+        didSet { defaults.set(showWhatsNew, forKey: Keys.showWhatsNew); markDirtyForSync() }
+    }
+
+    /// The signed-in Google account's email, or nil when not connected. Display-only — the
+    /// tokens that actually authorize sync live in the Keychain (`GoogleAuthService`), not here.
+    var googleAccountEmail: String? {
+        didSet { defaults.set(googleAccountEmail, forKey: Keys.googleAccountEmail) }
+    }
+
+    /// Master switch for Drive sync, independent of sign-in — a signed-in user can pause
+    /// syncing without disconnecting the account.
+    var syncEnabled: Bool {
+        didSet { defaults.set(syncEnabled, forKey: Keys.syncEnabled) }
+    }
+
+    /// When the last successful sync completed, for the Account section's subtitle.
+    var lastSyncDate: Date? {
+        didSet { defaults.set(lastSyncDate, forKey: Keys.lastSyncDate) }
+    }
+
+    /// The most recent sync failure's message, cleared on the next success — surfaced in the
+    /// Account section so a stale token or network drop doesn't fail silently.
+    var lastSyncError: String? {
+        didSet { defaults.set(lastSyncError, forKey: Keys.lastSyncError) }
+    }
+
+    /// Bumped whenever a syncable setting changes, so `SyncEngine` can last-write-wins against
+    /// the Drive copy with one shared timestamp rather than one per field. Not itself synced.
+    var settingsLastModified: Date {
+        didSet { defaults.set(settingsLastModified, forKey: Keys.settingsLastModified) }
     }
 
     private let defaults = UserDefaults.standard
@@ -207,6 +238,11 @@ final class Settings {
         static let historyLimit = "historyLimit"
         static let autoDeleteInterval = "autoDeleteInterval"
         static let showWhatsNew = "showWhatsNew"
+        static let googleAccountEmail = "googleAccountEmail"
+        static let syncEnabled = "syncEnabled"
+        static let lastSyncDate = "lastSyncDate"
+        static let lastSyncError = "lastSyncError"
+        static let settingsLastModified = "settingsLastModified"
     }
 
     private init() {
@@ -236,5 +272,66 @@ final class Settings {
             rawValue: defaults.string(forKey: Keys.autoDeleteInterval) ?? ""
         ) ?? .threeDays
         showWhatsNew = defaults.object(forKey: Keys.showWhatsNew) as? Bool ?? true
+        googleAccountEmail = defaults.string(forKey: Keys.googleAccountEmail)
+        syncEnabled = defaults.object(forKey: Keys.syncEnabled) as? Bool ?? false
+        lastSyncDate = defaults.object(forKey: Keys.lastSyncDate) as? Date
+        lastSyncError = defaults.string(forKey: Keys.lastSyncError)
+        settingsLastModified = defaults.object(forKey: Keys.settingsLastModified) as? Date ?? .distantPast
+    }
+
+    /// Called from every syncable property's `didSet`. Skipped while `SyncEngine` is applying a
+    /// pulled remote value, so applying a pull doesn't look like a local edit and bounce right
+    /// back to Drive.
+    private func markDirtyForSync() {
+        guard !SyncEngine.shared.isApplyingRemote else { return }
+        settingsLastModified = .now
+        SyncEngine.shared.scheduleSettingsPush()
+    }
+
+    /// Builds the account-level snapshot `SyncEngine` uploads — excludes machine-local settings
+    /// like `microphoneDeviceID`.
+    func syncSnapshot() -> SettingsSnapshot {
+        SettingsSnapshot(
+            pushToTalkKeyData: try? JSONEncoder().encode(pushToTalkKey),
+            pushToTalkEnabled: pushToTalkEnabled,
+            engine: engine.rawValue,
+            compareMode: compareMode,
+            cleanupEnabled: cleanupEnabled,
+            smartCleanup: smartCleanup,
+            soundEnabled: soundEnabled,
+            vadEnabled: vadEnabled,
+            removeFillerWords: removeFillerWords,
+            speechLanguage: speechLanguage,
+            translateToEnglish: translateToEnglish,
+            muteWhileRecording: muteWhileRecording,
+            appearance: appearance.rawValue,
+            historyLimit: historyLimit,
+            autoDeleteInterval: autoDeleteInterval.rawValue,
+            showWhatsNew: showWhatsNew
+        )
+    }
+
+    /// Applies a pulled snapshot, guarded so the resulting `didSet`s don't re-arm the push
+    /// debounce or bump `settingsLastModified` past the remote timestamp.
+    func applySyncSnapshot(_ snapshot: SettingsSnapshot, updatedAt: Date) {
+        if let data = snapshot.pushToTalkKeyData, let decoded = try? JSONDecoder().decode(PushToTalkKey.self, from: data) {
+            pushToTalkKey = decoded
+        }
+        pushToTalkEnabled = snapshot.pushToTalkEnabled
+        engine = SpeechEngineChoice(rawValue: snapshot.engine) ?? engine
+        compareMode = snapshot.compareMode
+        cleanupEnabled = snapshot.cleanupEnabled
+        smartCleanup = snapshot.smartCleanup
+        soundEnabled = snapshot.soundEnabled
+        vadEnabled = snapshot.vadEnabled
+        removeFillerWords = snapshot.removeFillerWords
+        speechLanguage = snapshot.speechLanguage
+        translateToEnglish = snapshot.translateToEnglish
+        muteWhileRecording = snapshot.muteWhileRecording
+        appearance = AppearanceMode(rawValue: snapshot.appearance) ?? appearance
+        historyLimit = snapshot.historyLimit
+        autoDeleteInterval = AutoDeleteInterval(rawValue: snapshot.autoDeleteInterval) ?? autoDeleteInterval
+        showWhatsNew = snapshot.showWhatsNew
+        settingsLastModified = updatedAt
     }
 }

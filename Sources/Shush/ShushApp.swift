@@ -69,6 +69,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // before the first dictation.
         RunLog.regenerate()
 
+        // No-ops until the user has signed in and turned sync on.
+        SyncEngine.shared.start()
+
         // Parakeet's models take ~20s to load from disk, and that cost lands on whichever
         // dictation touches them first — so the first hold after every launch would stall
         // with the HUD showing nothing. Warm them in the background instead, but only when
@@ -99,7 +102,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// `shush://clear` and `shush://show`, used by the legacy HTML dashboard and
-    /// as a scriptable way to raise the window.
+    /// as a scriptable way to raise the window. Google sign-in's redirect doesn't come through
+    /// here — it's a local loopback HTTP listener, not this URL scheme (see
+    /// `LoopbackRedirectServer`).
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme == "shush" {
             switch url.host {

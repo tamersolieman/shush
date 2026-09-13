@@ -8,12 +8,14 @@ import SwiftUI
 /// against other users, because Shush only ever sees this machine.
 struct StatsDashboard: View {
     @State private var lifetimeStore = LifetimeStatsStore.shared
-    private var stats: DictationStats { DictationStats(stats: lifetimeStore.current) }
+    // `merged`: this device's totals plus every synced device's last-pushed snapshot. Equals
+    // `current` when signed out or never synced, so this is a strict superset of prior behavior.
+    private var stats: DictationStats { DictationStats(stats: lifetimeStore.merged) }
 
     var body: some View {
         ScrollView {
             VStack(spacing: DS.Space.roomy) {
-                if lifetimeStore.current.totalRuns == 0 {
+                if lifetimeStore.merged.totalRuns == 0 {
                     EmptyPage(title: "No stats yet", detail: "Dictate something — the numbers fill in from there.")
                         .frame(minHeight: 300)
                 } else {

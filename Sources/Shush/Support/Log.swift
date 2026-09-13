@@ -6,4 +6,5 @@ enum Log {
     static let hotkey = Logger(subsystem: "ai.pivotstudio.shush", category: "hotkey")
     static let inject = Logger(subsystem: "ai.pivotstudio.shush", category: "inject")
     static let app = Logger(subsystem: "ai.pivotstudio.shush", category: "app")
+    static let sync = Logger(subsystem: "ai.pivotstudio.shush", category: "sync")
 }

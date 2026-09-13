@@ -15,6 +15,7 @@ struct SettingsPageView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                AccountSection(settings: settings)
                 AppearanceSection(settings: settings)
                 DictationSection(controller: controller, settings: settings)
                 SpeechRecognitionSection(settings: settings)
@@ -552,6 +553,72 @@ private struct HistorySection: View {
     }
 }
 
+// MARK: - Account
+
+private struct AccountSection: View {
+    @Bindable var settings: Settings
+    @State private var auth = GoogleAuthService.shared
+    @State private var isConnecting = false
+
+    var body: some View {
+        SectionHeader(title: "Account")
+
+        if let email = settings.googleAccountEmail {
+            SettingsRow(title: "Signed In") {
+                Text(email)
+                    .font(DS.Font.value)
+                    .foregroundStyle(DS.Color.textTertiary)
+            }
+            CardDivider()
+
+            ToggleRow(title: "Sync Settings, Dictionary & Stats", isOn: $settings.syncEnabled)
+            RowSubtitle("Synced via a private, app-only folder in your Google Drive.")
+            CardDivider()
+
+            SettingsRow(title: "Last Synced") {
+                Button("Sync Now") { Task { await SyncEngine.shared.syncNow() } }
+                    .buttonStyle(.plain)
+                    .font(DS.Font.button)
+                    .foregroundStyle(DS.Color.primary)
+            }
+            RowSubtitle(lastSyncSubtitle, isError: settings.lastSyncError != nil)
+            CardDivider()
+
+            SettingsRow(title: "Disconnect") {
+                Button("Disconnect") { Task { await auth.disconnect() } }
+                    .buttonStyle(.plain)
+                    .font(DS.Font.button)
+                    .foregroundStyle(DS.Color.danger)
+            }
+        } else {
+            SettingsRow(title: "Google Account") {
+                Button(isConnecting ? "Connecting…" : "Connect") {
+                    Task {
+                        isConnecting = true
+                        defer { isConnecting = false }
+                        try? await auth.signIn()
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(DS.Font.button)
+                .foregroundStyle(DS.Color.primary)
+                .disabled(isConnecting)
+            }
+            RowSubtitle("Sync Settings, Dictionary and lifetime stats across your Macs via a private, app-only Drive folder.")
+        }
+    }
+
+    private var lastSyncSubtitle: String {
+        if let error = settings.lastSyncError {
+            return "Sync failed: \(error)"
+        }
+        if let date = settings.lastSyncDate {
+            return "Synced \(date.formatted(.relative(presentation: .named)))"
+        }
+        return "Not synced yet"
+    }
+}
+
 // MARK: - About
 
 private struct AboutSection: View {
@@ -626,13 +693,17 @@ private struct AboutSection: View {
 
 private struct RowSubtitle: View {
     let text: String
-    init(_ text: String) { self.text = text }
+    let isError: Bool
+    init(_ text: String, isError: Bool = false) {
+        self.text = text
+        self.isError = isError
+    }
 
     var body: some View {
         HStack {
             Text(text)
                 .font(DS.Font.meta)
-                .foregroundStyle(DS.Color.textTertiary)
+                .foregroundStyle(isError ? DS.Color.danger : DS.Color.textTertiary)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, DS.Space.base)

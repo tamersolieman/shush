@@ -36,5 +36,11 @@ let package = Package(
             resources: [.copy("dictionary-test-vectors.json")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .testTarget(
+            name: "ShushSyncTests",
+            dependencies: ["Shush"],
+            path: "Tests/ShushSyncTests",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ]
 )
