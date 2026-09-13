@@ -345,6 +345,14 @@ private struct TranscriptionSection: View {
         RowSubtitle("Removes common hesitation words from transcriptions. Turn off to keep them.")
         CardDivider()
 
+        ToggleRow(title: "Learn From Corrections", isOn: $settings.learnFromCorrectionsEnabled)
+        RowSubtitle(
+            "After Shush types something, watch briefly for you fixing a word by hand and "
+                + "offer to save it as a dictionary correction. Off by default — this reads "
+                + "text from whatever app you're typing in right after dictation."
+        )
+        CardDivider()
+
         VStack(alignment: .leading, spacing: DS.Space.tight) {
             Text("Custom Words")
                 .font(DS.Font.label)

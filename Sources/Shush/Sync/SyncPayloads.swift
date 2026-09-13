@@ -30,6 +30,7 @@ struct SettingsSnapshot: Codable {
     var soundEnabled: Bool
     var vadEnabled: Bool
     var removeFillerWords: Bool
+    var learnFromCorrectionsEnabled: Bool
     var speechLanguage: String
     var translateToEnglish: Bool
     var muteWhileRecording: Bool

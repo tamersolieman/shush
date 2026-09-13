@@ -7,4 +7,5 @@ enum Log {
     static let inject = Logger(subsystem: "ai.pivotstudio.shush", category: "inject")
     static let app = Logger(subsystem: "ai.pivotstudio.shush", category: "app")
     static let sync = Logger(subsystem: "ai.pivotstudio.shush", category: "sync")
+    static let correction = Logger(subsystem: "ai.pivotstudio.shush", category: "correction")
 }

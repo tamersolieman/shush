@@ -49,6 +49,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let controller = DictationController()
     private var hud: HUDPanel?
     private var stateObservation: NSObjectProtocol?
+    /// Owns the live toast so it isn't deallocated out from under itself — `CorrectionWatcher`
+    /// only hands back a detected correction, it doesn't own any UI.
+    private var correctionToast: CorrectionToastPanel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // A regular app now: dock icon, app menu, standard windows. The HUD is still a
@@ -71,6 +74,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // No-ops until the user has signed in and turned sync on.
         SyncEngine.shared.start()
+
+        CorrectionWatcher.shared.onCorrectionDetected = { [weak self] correction, element in
+            guard let self else { return }
+            self.correctionToast?.dismiss()
+            let toast = CorrectionToastPanel(
+                correction: correction,
+                onSave: { DictionaryStore.shared.add(.correction(hear: correction.hear, write: correction.write)) },
+                onDismiss: {}
+            )
+            self.correctionToast = toast
+            toast.present(near: element)
+        }
 
         // Parakeet's models take ~20s to load from disk, and that cost lands on whichever
         // dictation touches them first — so the first hold after every launch would stall

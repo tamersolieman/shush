@@ -16,6 +16,7 @@ struct SyncPayloadCodecTests {
             soundEnabled: true,
             vadEnabled: true,
             removeFillerWords: true,
+            learnFromCorrectionsEnabled: false,
             speechLanguage: "auto",
             translateToEnglish: false,
             muteWhileRecording: false,

@@ -364,6 +364,9 @@ final class DictationController {
             let target = NSWorkspace.shared.frontmostApplication
             recordRun(text: output, corrections: corrections, appName: target?.localizedName, appBundleID: target?.bundleIdentifier)
             TextInjector.insert(output)
+            if Settings.shared.learnFromCorrectionsEnabled && Permissions.hasAccessibility {
+                CorrectionWatcher.shared.observe(injected: output, target: target)
+            }
             if Settings.shared.soundEnabled { NSSound(named: "Pop")?.play() }
 
             state = .idle

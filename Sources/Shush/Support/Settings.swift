@@ -138,6 +138,14 @@ final class Settings {
         didSet { defaults.set(removeFillerWords, forKey: Keys.removeFillerWords); markDirtyForSync() }
     }
 
+    /// Watches the field a dictation was just typed into for a short window afterward; if
+    /// the edit looks like a targeted word/phrase fix, offers to save it as a dictionary
+    /// correction. Off by default — unlike most toggles here, this reads live text out of
+    /// whatever app you're using right after Shush's own UI loses relevance, so it's opt-in.
+    var learnFromCorrectionsEnabled: Bool {
+        didSet { defaults.set(learnFromCorrectionsEnabled, forKey: Keys.learnFromCorrectionsEnabled); markDirtyForSync() }
+    }
+
     /// A BCP-47 identifier ("en-US", "es-ES", …), or "auto" for the system's current
     /// locale. Only `AppleSpeechEngine` honors this — Parakeet is English-only.
     var speechLanguage: String {
@@ -227,6 +235,7 @@ final class Settings {
         static let soundEnabled = "soundEnabled"
         static let vadEnabled = "vadEnabled"
         static let removeFillerWords = "removeFillerWords"
+        static let learnFromCorrectionsEnabled = "learnFromCorrectionsEnabled"
         static let engine = "engine"
         static let smartCleanup = "smartCleanup"
         static let compareMode = "compareMode"
@@ -261,6 +270,7 @@ final class Settings {
         soundEnabled = defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true
         vadEnabled = defaults.object(forKey: Keys.vadEnabled) as? Bool ?? true
         removeFillerWords = defaults.object(forKey: Keys.removeFillerWords) as? Bool ?? true
+        learnFromCorrectionsEnabled = defaults.object(forKey: Keys.learnFromCorrectionsEnabled) as? Bool ?? false
         speechLanguage = defaults.string(forKey: Keys.speechLanguage) ?? "auto"
         translateToEnglish = defaults.object(forKey: Keys.translateToEnglish) as? Bool ?? false
         microphoneDeviceID = defaults.string(forKey: Keys.microphoneDeviceID)
@@ -301,6 +311,7 @@ final class Settings {
             soundEnabled: soundEnabled,
             vadEnabled: vadEnabled,
             removeFillerWords: removeFillerWords,
+            learnFromCorrectionsEnabled: learnFromCorrectionsEnabled,
             speechLanguage: speechLanguage,
             translateToEnglish: translateToEnglish,
             muteWhileRecording: muteWhileRecording,
@@ -325,6 +336,7 @@ final class Settings {
         soundEnabled = snapshot.soundEnabled
         vadEnabled = snapshot.vadEnabled
         removeFillerWords = snapshot.removeFillerWords
+        learnFromCorrectionsEnabled = snapshot.learnFromCorrectionsEnabled
         speechLanguage = snapshot.speechLanguage
         translateToEnglish = snapshot.translateToEnglish
         muteWhileRecording = snapshot.muteWhileRecording
