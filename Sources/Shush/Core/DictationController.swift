@@ -66,9 +66,10 @@ final class DictationController {
     /// Chosen per-utterance so the menu toggle applies to the very next hold.
     private var activeFormatter: any TextFormatter {
         if let formatter { return formatter }
+        let removeFillerWords = Settings.shared.removeFillerWords
         return Settings.shared.smartCleanup
-            ? FoundationModelFormatter()
-            : RuleBasedFormatter()
+            ? FoundationModelFormatter(removeFillerWords: removeFillerWords)
+            : RuleBasedFormatter(removeFillerWords: removeFillerWords)
     }
 
     private var engine: (any TranscriptionEngine)?
@@ -245,6 +246,8 @@ final class DictationController {
                 try capture.start(
                     outputFormat: format,
                     microphoneDeviceID: microphoneDeviceID,
+                    vadEnabled: Settings.shared.vadEnabled,
+                    vadTailSeconds: Settings.shared.engine.showsLiveText ? 0.8 : 0.35,
                     onBuffer: { chunk in
                         audioContinuation.yield(chunk)
                     },

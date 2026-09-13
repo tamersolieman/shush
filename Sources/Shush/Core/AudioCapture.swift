@@ -12,6 +12,20 @@ final class AudioCapture: @unchecked Sendable {
     private nonisolated(unsafe) var outputFormat: AVAudioFormat?
     private var isRunning = false
 
+    /// Below this level (the same 0…1 `rms(of:)` uses for the HUD waveform, roughly
+    /// -50…0 dBFS) a buffer counts as silence. Empirical — quiet room tone and mic
+    /// self-noise both sit comfortably under this on typical hardware, while even soft
+    /// speech clears it.
+    private static let silenceThreshold: Float = 0.15
+
+    private nonisolated(unsafe) var vadEnabled = true
+    /// How long to keep forwarding audio after the last voiced buffer, so a mid-sentence
+    /// pause doesn't get chopped out from under the speaker.
+    private nonisolated(unsafe) var vadTailSeconds: TimeInterval = 0.5
+    /// Wall-clock time of the last buffer that cleared the silence threshold. Starts at the
+    /// epoch so leading silence before the first word is dropped too.
+    private nonisolated(unsafe) var lastVoiceAt: TimeInterval = 0
+
     /// Called on the audio thread with each converted buffer.
     private nonisolated(unsafe) var onBuffer: (@Sendable (AudioChunk) -> Void)?
     /// Called on the audio thread with a 0…1 RMS level, for the HUD waveform.
@@ -20,6 +34,8 @@ final class AudioCapture: @unchecked Sendable {
     func start(
         outputFormat: AVAudioFormat,
         microphoneDeviceID: AudioDeviceID? = nil,
+        vadEnabled: Bool = true,
+        vadTailSeconds: TimeInterval = 0.5,
         onBuffer: @escaping @Sendable (AudioChunk) -> Void,
         onLevel: @escaping @Sendable (Float) -> Void
     ) throws {
@@ -28,6 +44,9 @@ final class AudioCapture: @unchecked Sendable {
         self.onBuffer = onBuffer
         self.onLevel = onLevel
         self.outputFormat = outputFormat
+        self.vadEnabled = vadEnabled
+        self.vadTailSeconds = vadTailSeconds
+        self.lastVoiceAt = 0
 
         let input = engine.inputNode
         // Must happen before reading the native format below — switching devices can
@@ -70,9 +89,19 @@ final class AudioCapture: @unchecked Sendable {
     // MARK: - Audio thread
 
     private func handle(_ buffer: AVAudioPCMBuffer) {
-        onLevel?(Self.rms(of: buffer))
+        let level = Self.rms(of: buffer)
+        onLevel?(level)
 
         guard let outputFormat else { return }
+
+        if vadEnabled {
+            let now = CFAbsoluteTimeGetCurrent()
+            if level >= Self.silenceThreshold {
+                lastVoiceAt = now
+            } else if now - lastVoiceAt > vadTailSeconds {
+                return
+            }
+        }
 
         // AVAudioEngine reuses the tap's buffer as soon as this returns, so the engine
         // must never see it directly — copy when no conversion would otherwise allocate.

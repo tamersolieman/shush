@@ -122,6 +122,21 @@ final class Settings {
         didSet { defaults.set(soundEnabled, forKey: Keys.soundEnabled) }
     }
 
+    /// Filters silence out of the capture in real time. Streaming-capable engines (Apple)
+    /// keep a longer tail after speech drops off, since cutting audio too eagerly costs
+    /// them recognition context; batch engines can afford a shorter one. Off records raw,
+    /// unfiltered audio.
+    var vadEnabled: Bool {
+        didSet { defaults.set(vadEnabled, forKey: Keys.vadEnabled) }
+    }
+
+    /// Strips hesitation words (um, uh, …) during cleanup. Independent of `cleanupEnabled`
+    /// so a user who wants punctuation/spacing fixes but not filler removal can have both —
+    /// though with cleanup off entirely, this has nothing to act on.
+    var removeFillerWords: Bool {
+        didSet { defaults.set(removeFillerWords, forKey: Keys.removeFillerWords) }
+    }
+
     /// A BCP-47 identifier ("en-US", "es-ES", …), or "auto" for the system's current
     /// locale. Only `AppleSpeechEngine` honors this — Parakeet is English-only.
     var speechLanguage: String {
@@ -179,6 +194,8 @@ final class Settings {
         static let pushToTalkEnabled = "pushToTalkEnabled"
         static let cleanupEnabled = "cleanupEnabled"
         static let soundEnabled = "soundEnabled"
+        static let vadEnabled = "vadEnabled"
+        static let removeFillerWords = "removeFillerWords"
         static let engine = "engine"
         static let smartCleanup = "smartCleanup"
         static let compareMode = "compareMode"
@@ -206,6 +223,8 @@ final class Settings {
         smartCleanup = defaults.object(forKey: Keys.smartCleanup) as? Bool ?? false
         compareMode = defaults.object(forKey: Keys.compareMode) as? Bool ?? false
         soundEnabled = defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true
+        vadEnabled = defaults.object(forKey: Keys.vadEnabled) as? Bool ?? true
+        removeFillerWords = defaults.object(forKey: Keys.removeFillerWords) as? Bool ?? true
         speechLanguage = defaults.string(forKey: Keys.speechLanguage) ?? "auto"
         translateToEnglish = defaults.object(forKey: Keys.translateToEnglish) as? Bool ?? false
         microphoneDeviceID = defaults.string(forKey: Keys.microphoneDeviceID)

@@ -1,6 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 import FluidAudio
+import ShushDictionary
 import Speech
 import SwiftUI
 
@@ -17,6 +18,7 @@ struct SettingsPageView: View {
                 AppearanceSection(settings: settings)
                 DictationSection(controller: controller, settings: settings)
                 SpeechRecognitionSection(settings: settings)
+                TranscriptionSection(settings: settings)
                 AudioSection(settings: settings)
                 ModelSection(settings: settings)
                 CleanupSection(settings: settings)
@@ -266,6 +268,76 @@ private struct SpeechRecognitionSection: View {
 
     private func displayName(for identifier: String) -> String {
         Locale.current.localizedString(forIdentifier: identifier)?.capitalized ?? identifier
+    }
+}
+
+// MARK: - Transcription
+
+private struct TranscriptionSection: View {
+    @Bindable var settings: Settings
+    @State private var store = DictionaryStore.shared
+    @State private var newWord = ""
+
+    var body: some View {
+        SectionHeader(title: "Transcription")
+
+        ToggleRow(title: "Voice Activity Detection", isOn: $settings.vadEnabled)
+        RowSubtitle(
+            "Filter silence from recordings. Streaming-capable models use a longer VAD "
+                + "tail; disabling VAD records raw audio."
+        )
+        CardDivider()
+
+        ToggleRow(title: "Remove Filler Words", isOn: $settings.removeFillerWords)
+        RowSubtitle("Removes common hesitation words from transcriptions. Turn off to keep them.")
+        CardDivider()
+
+        VStack(alignment: .leading, spacing: DS.Space.tight) {
+            Text("Custom Words")
+                .font(DS.Font.label)
+                .foregroundStyle(DS.Color.textPrimary)
+            Text(
+                "Help supported models recognize names and specialized terms. Fuzzy "
+                    + "correction is currently limited to words using A–Z and numbers."
+            )
+            .font(DS.Font.meta)
+            .foregroundStyle(DS.Color.textTertiary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, DS.Space.base)
+        .padding(.top, DS.Space.base)
+
+        HStack(spacing: DS.Space.snug) {
+            TextField("Add a word", text: $newWord)
+                .textFieldStyle(.plain)
+                .font(DS.Font.body)
+                .foregroundStyle(DS.Color.textPrimary)
+                .padding(.horizontal, DS.Space.base)
+                .frame(height: 32)
+                .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.control))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.Radius.control)
+                        .strokeBorder(DS.Color.border, lineWidth: DS.Border.hairline)
+                )
+                .onSubmit(addWord)
+
+            Button("Add", action: addWord)
+                .buttonStyle(.plain)
+                .padding(.horizontal, DS.Space.roomy)
+                .frame(height: 32)
+                .background(DS.Color.surfaceSecondary, in: .rect(cornerRadius: DS.Radius.control))
+                .foregroundStyle(DS.Color.textPrimary)
+                .disabled(newWord.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(.horizontal, DS.Space.base)
+        .padding(.vertical, DS.Space.base)
+    }
+
+    private func addWord() {
+        let word = newWord.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !word.isEmpty else { return }
+        store.add(.term(word))
+        newWord = ""
     }
 }
 
