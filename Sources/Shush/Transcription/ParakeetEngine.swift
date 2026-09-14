@@ -44,8 +44,7 @@ actor ParakeetEngine: TranscriptionEngine {
         // performs **no resampling and no rate validation**. Feed it the wrong sample rate
         // and it doesn't throw — it silently transcribes garbage.
         //
-        // That's a live risk here. In compare mode the capture format is dictated by
-        // Apple's analyzer, and `bestAvailableAudioFormat` may legitimately return 8 kHz
+        // That's a live risk here: `bestAvailableAudioFormat` may legitimately return 8 kHz
         // as well as 16 kHz. `resampleBuffer` normalizes whatever arrives to the 16 kHz
         // mono float32 the model expects, and its Int16→Float path is bit-identical to
         // dividing by 32768, so nothing is lost versus doing it by hand.

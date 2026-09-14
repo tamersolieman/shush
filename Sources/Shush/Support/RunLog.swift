@@ -1,5 +1,6 @@
 import ShushDictionary
 import Foundation
+import Observation
 
 /// One completed dictation.
 struct DictationRun: Codable, Sendable, Identifiable {
@@ -17,9 +18,6 @@ struct DictationRun: Codable, Sendable, Identifiable {
     /// Release → final text ready. This is the latency you actually feel.
     let processSeconds: Double
     let text: String
-    /// Shared by every engine that processed the same recording, so the dashboard can
-    /// present them as one side-by-side comparison instead of unrelated rows.
-    var group: String?
 
     /// Dictionary corrections that fired on this transcript. Recorded so history can show
     /// whether the dictionary is actually doing anything, rather than leaving it to faith.
@@ -29,8 +27,7 @@ struct DictationRun: Codable, Sendable, Identifiable {
     var corrections: [AppliedCorrection]?
 
     /// The app that received the text — captured from the frontmost app right before
-    /// injection. Nil for runs recorded before this existed, and for comparison runs
-    /// (nothing is injected in compare mode).
+    /// injection. Nil for runs recorded before this existed.
     var appName: String?
     var appBundleID: String?
 
@@ -45,7 +42,6 @@ struct DictationRun: Codable, Sendable, Identifiable {
         audioSeconds: Double,
         processSeconds: Double,
         text: String,
-        group: String? = nil,
         corrections: [AppliedCorrection]? = nil,
         appName: String? = nil,
         appBundleID: String? = nil
@@ -56,7 +52,6 @@ struct DictationRun: Codable, Sendable, Identifiable {
         self.audioSeconds = audioSeconds
         self.processSeconds = processSeconds
         self.text = text
-        self.group = group
         self.corrections = corrections
         self.appName = appName
         self.appBundleID = appBundleID
@@ -70,10 +65,24 @@ struct DictationRun: Codable, Sendable, Identifiable {
         audioSeconds = try container.decode(Double.self, forKey: .audioSeconds)
         processSeconds = try container.decode(Double.self, forKey: .processSeconds)
         text = try container.decode(String.self, forKey: .text)
-        group = try container.decodeIfPresent(String.self, forKey: .group)
         corrections = try container.decodeIfPresent([AppliedCorrection].self, forKey: .corrections)
         appName = try container.decodeIfPresent(String.self, forKey: .appName)
         appBundleID = try container.decodeIfPresent(String.self, forKey: .appBundleID)
+    }
+}
+
+/// Live-updating store behind the dashboard and transcript history views.
+@MainActor
+@Observable
+final class RunStore {
+    static let shared = RunStore()
+
+    private(set) var runs: [DictationRun] = []
+
+    private init() { reload() }
+
+    func reload() {
+        runs = RunLog.load()
     }
 }
 
@@ -139,7 +148,6 @@ enum RunLog {
         let runs = load()
         try? DashboardHTML.render(
             runs: runs,
-            compareMode: Settings.shared.compareMode,
             key: Settings.shared.pushToTalkKey.displayName
         ).write(to: dashboardURL, atomically: true, encoding: .utf8)
     }
@@ -147,12 +155,6 @@ enum RunLog {
     /// Deletes one run.
     static func delete(_ run: DictationRun) {
         delete(ids: [run.id])
-    }
-
-    /// Deletes every run in a comparison group — the engines all transcribed one utterance,
-    /// so removing that utterance means removing all of its rows.
-    static func deleteGroup(_ group: String) {
-        rewrite(load().filter { $0.group != group })
     }
 
     static func delete(ids: Set<UUID>) {

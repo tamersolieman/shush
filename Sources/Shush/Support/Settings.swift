@@ -102,12 +102,6 @@ final class Settings {
         didSet { defaults.set(engine.rawValue, forKey: Keys.engine); markDirtyForSync() }
     }
 
-    /// Run every engine on each recording and show them side by side, instead of
-    /// transcribing with one. Nothing is typed into the focused app in this mode.
-    var compareMode: Bool {
-        didSet { defaults.set(compareMode, forKey: Keys.compareMode); markDirtyForSync() }
-    }
-
     /// Run the cleanup pass before injecting. Off = raw engine output.
     var cleanupEnabled: Bool {
         didSet { defaults.set(cleanupEnabled, forKey: Keys.cleanupEnabled); markDirtyForSync() }
@@ -238,7 +232,6 @@ final class Settings {
         static let learnFromCorrectionsEnabled = "learnFromCorrectionsEnabled"
         static let engine = "engine"
         static let smartCleanup = "smartCleanup"
-        static let compareMode = "compareMode"
         static let speechLanguage = "speechLanguage"
         static let translateToEnglish = "translateToEnglish"
         static let microphoneDeviceID = "microphoneDeviceID"
@@ -266,7 +259,6 @@ final class Settings {
         engine = SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "") ?? .apple
         cleanupEnabled = defaults.object(forKey: Keys.cleanupEnabled) as? Bool ?? true
         smartCleanup = defaults.object(forKey: Keys.smartCleanup) as? Bool ?? false
-        compareMode = defaults.object(forKey: Keys.compareMode) as? Bool ?? false
         soundEnabled = defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true
         vadEnabled = defaults.object(forKey: Keys.vadEnabled) as? Bool ?? true
         removeFillerWords = defaults.object(forKey: Keys.removeFillerWords) as? Bool ?? true
@@ -305,7 +297,6 @@ final class Settings {
             pushToTalkKeyData: try? JSONEncoder().encode(pushToTalkKey),
             pushToTalkEnabled: pushToTalkEnabled,
             engine: engine.rawValue,
-            compareMode: compareMode,
             cleanupEnabled: cleanupEnabled,
             smartCleanup: smartCleanup,
             soundEnabled: soundEnabled,
@@ -330,7 +321,6 @@ final class Settings {
         }
         pushToTalkEnabled = snapshot.pushToTalkEnabled
         engine = SpeechEngineChoice(rawValue: snapshot.engine) ?? engine
-        compareMode = snapshot.compareMode
         cleanupEnabled = snapshot.cleanupEnabled
         smartCleanup = snapshot.smartCleanup
         soundEnabled = snapshot.soundEnabled

@@ -39,7 +39,9 @@ ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := -
 endif
 
-.PHONY: all build app run install clean icon
+DMG := $(STAGE)/$(EXEC).dmg
+
+.PHONY: all build app run install clean icon dmg
 
 all: app
 
@@ -98,6 +100,18 @@ install: app
 	@cp -R "$(BUNDLE)" "/Applications/$(APPNAME)"
 	@open "/Applications/$(APPNAME)"
 	@echo "installed to /Applications/$(APPNAME)"
+
+## Distributable disk image. Use `make dmg CONFIG=release` for a shipping build — plain
+## `make dmg` packages whatever CONFIG is set to (debug by default).
+dmg: app
+	@rm -f "$(DMG)"
+	@rm -rf "$(STAGE)/dmg-src"
+	@mkdir -p "$(STAGE)/dmg-src"
+	@cp -R "$(BUNDLE)" "$(STAGE)/dmg-src/$(APPNAME)"
+	@ln -s /Applications "$(STAGE)/dmg-src/Applications"
+	@hdiutil create -volname "$(EXEC)" -srcfolder "$(STAGE)/dmg-src" -ov -format UDZO "$(DMG)"
+	@rm -rf "$(STAGE)/dmg-src"
+	@echo "wrote $(DMG)"
 
 clean:
 	@rm -rf .build "$(STAGE)" "$(SCRATCH)"

@@ -24,7 +24,6 @@ struct SettingsSnapshot: Codable {
     var pushToTalkKeyData: Data?
     var pushToTalkEnabled: Bool
     var engine: String
-    var compareMode: Bool
     var cleanupEnabled: Bool
     var smartCleanup: Bool
     var soundEnabled: Bool

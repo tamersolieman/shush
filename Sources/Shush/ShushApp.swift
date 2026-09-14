@@ -35,12 +35,6 @@ struct ShushApp: App {
             StatusBarIcon()
                 .opacity(delegate.controller.state.isActive ? 1 : 0.55)
         }
-
-        Window("Engine comparison", id: "comparison") {
-            ComparisonWindow(controller: delegate.controller)
-        }
-        .defaultSize(width: 640, height: 560)
-        .windowResizability(.contentMinSize)
     }
 }
 
@@ -91,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // dictation touches them first — so the first hold after every launch would stall
         // with the HUD showing nothing. Warm them in the background instead, but only when
         // they're actually going to be used and are already downloaded.
-        let willUseParakeet = Settings.shared.compareMode || Settings.shared.engine == .parakeet
+        let willUseParakeet = Settings.shared.engine == .parakeet
         if willUseParakeet, ParakeetModels.isDownloaded {
             Task.detached(priority: .utility) {
                 _ = try? await ParakeetModels.shared.manager()
@@ -103,50 +97,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Every `make install` relaunches the app and drops its windows. Restoring the
-        // window when it was open last time keeps it from vanishing on each rebuild.
-        if UserDefaults.standard.bool(forKey: "comparisonWindowOpen") {
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(400))
-                Self.showComparisonWindow()
-            }
-        }
-
         observeState()
         Log.app.info("Shush ready — hold \(Settings.shared.pushToTalkKey.displayName) to dictate")
     }
 
-    /// `shush://clear` and `shush://show`, used by the legacy HTML dashboard and
-    /// as a scriptable way to raise the window. Google sign-in's redirect doesn't come through
-    /// here — it's a local loopback HTTP listener, not this URL scheme (see
+    /// `shush://clear`, used by the legacy HTML dashboard.  Google sign-in's redirect doesn't
+    /// come through here — it's a local loopback HTTP listener, not this URL scheme (see
     /// `LoopbackRedirectServer`).
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme == "shush" {
             switch url.host {
             case "clear":
                 RunLog.clear()
-                RunStore.shared.reload()
-            case "show":
-                Self.showComparisonWindow()
             default:
                 break
             }
         }
     }
 
-    /// Raises the comparison window without needing SwiftUI's `openWindow` environment
-    /// value — usable from the app delegate and from a URL handler.
-    static func showComparisonWindow() {
-        RunStore.shared.reload()
-        if let existing = NSApp.windows.first(where: { $0.title == "Engine comparison" }) {
-            existing.makeKeyAndOrderFront(nil)
-        }
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
     func applicationWillTerminate(_ notification: Notification) {
-        let isOpen = NSApp.windows.contains { $0.title == "Engine comparison" && $0.isVisible }
-        UserDefaults.standard.set(isOpen, forKey: "comparisonWindowOpen")
         controller.deactivate()
     }
 
@@ -181,7 +150,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 private struct MenuContent: View {
     @Bindable var controller: DictationController
     @State private var settings = Settings.shared
-    @Environment(\.openWindow) private var openWindow
     @State private var isPreloadingParakeet = false
     @State private var parakeetOnDisk = ParakeetModels.isDownloaded
     @State private var isPreloadingCohere = false
@@ -234,13 +202,9 @@ private struct MenuContent: View {
         Text("Push-to-talk key: \(settings.pushToTalkKey.displayName)")
             .foregroundStyle(.secondary)
 
-        Toggle("Compare mode (both engines)", isOn: $settings.compareMode)
-
-        if !settings.compareMode {
-            Picker("Engine", selection: $settings.engine) {
-                ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
-                    Text(choice.displayName).tag(choice)
-                }
+        Picker("Engine", selection: $settings.engine) {
+            ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
+                Text(choice.displayName).tag(choice)
             }
         }
 
@@ -257,13 +221,6 @@ private struct MenuContent: View {
         Toggle("Sound", isOn: $settings.soundEnabled)
 
         Divider()
-
-        Button("Show comparison window") {
-            RunStore.shared.reload()
-            openWindow(id: "comparison")
-            NSApp.activate(ignoringOtherApps: true)
-        }
-        .keyboardShortcut("d")
 
         // Downloading ~470 MB on the first hold would look like a hang, so offer to do it
         // deliberately instead.

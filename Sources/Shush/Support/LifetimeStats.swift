@@ -20,7 +20,7 @@ struct LifetimeStats: Codable {
     var wordsCorrected: Int = 0
     /// Keyed by bundle id (or app name when no bundle id was captured).
     var appTallies: [String: AppTally] = [:]
-    /// Keyed by "yyyy-MM-dd" — every recording counts here, including comparison runs,
+    /// Keyed by "yyyy-MM-dd" — every recording counts here,
     /// since the streak tracks "were you here" rather than "was text injected".
     var dayCounts: [String: Int] = [:]
     /// Keyed by "yyyy-MM" — injected runs only, for month-over-month.
@@ -74,21 +74,17 @@ final class LifetimeStatsStore {
         let calendar = Calendar.current
         stats.dayCounts[Self.dayKey(run.date, calendar: calendar), default: 0] += 1
 
-        // Comparison runs inject nothing, so they don't count as "spoken output" — same
-        // filter the dashboard's own stats use.
-        if run.group == nil {
-            stats.totalWords += run.wordCount
-            stats.totalAudioSeconds += run.audioSeconds
-            stats.dictionaryFixes += run.corrections?.count ?? 0
-            stats.wordsCorrected += run.corrections?.reduce(0) { $0 + $1.count } ?? 0
-            stats.monthWords[Self.monthKey(run.date, calendar: calendar), default: 0] += run.wordCount
+        stats.totalWords += run.wordCount
+        stats.totalAudioSeconds += run.audioSeconds
+        stats.dictionaryFixes += run.corrections?.count ?? 0
+        stats.wordsCorrected += run.corrections?.reduce(0) { $0 + $1.count } ?? 0
+        stats.monthWords[Self.monthKey(run.date, calendar: calendar), default: 0] += run.wordCount
 
-            if let name = run.appName {
-                let id = run.appBundleID ?? name
-                var tally = stats.appTallies[id] ?? LifetimeStats.AppTally(name: name, bundleID: run.appBundleID, count: 0)
-                tally.count += 1
-                stats.appTallies[id] = tally
-            }
+        if let name = run.appName {
+            let id = run.appBundleID ?? name
+            var tally = stats.appTallies[id] ?? LifetimeStats.AppTally(name: name, bundleID: run.appBundleID, count: 0)
+            tally.count += 1
+            stats.appTallies[id] = tally
         }
 
         current = stats

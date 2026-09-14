@@ -128,9 +128,6 @@ private struct DictationStats {
         return "\(max(Int(stats.totalAudioSeconds / 60), 0))m"
     }
 
-    /// Rough per-session average — `totalRuns` includes comparison runs (which inject no
-    /// words), so this slightly undercounts true injected-run averages rather than needing a
-    /// second tally just for this one number.
     var avgWordsPerSession: Int {
         guard stats.totalRuns > 0 else { return 0 }
         return Int((Double(stats.totalWords) / Double(stats.totalRuns)).rounded())
@@ -191,8 +188,8 @@ private struct DictationStats {
     }
 
     /// GitHub-style streak: every calendar day in the visible window, how many recordings
-    /// (any kind — comparisons count too, this is "were you here" not "did you inject
-    /// text"), plus the current and longest consecutive-day runs across all history. Built
+    /// happened ("were you here" not "did you inject text"), plus the current and longest
+    /// consecutive-day runs across all history. Built
     /// from the lifetime day-count tally, so deleted entries don't erase the streak.
     ///
     /// `page` pages the visible window back one full width (0 = the most recent weeks,
