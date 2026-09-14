@@ -25,6 +25,9 @@ struct SettingsPageView: View {
                 CollapsibleSection(title: "Dictation", id: "dictation") {
                     DictationSection(controller: controller, settings: settings)
                 }
+                CollapsibleSection(title: "Model", id: "model") {
+                    ModelSection(settings: settings)
+                }
                 CollapsibleSection(title: "Speech Recognition", id: "speechRecognition") {
                     SpeechRecognitionSection(settings: settings)
                 }
@@ -33,9 +36,6 @@ struct SettingsPageView: View {
                 }
                 CollapsibleSection(title: "Audio", id: "audio") {
                     AudioSection(settings: settings)
-                }
-                CollapsibleSection(title: "Model", id: "model") {
-                    ModelSection(settings: settings)
                 }
                 CollapsibleSection(title: "Cleanup", id: "cleanup") {
                     CleanupSection(settings: settings)
