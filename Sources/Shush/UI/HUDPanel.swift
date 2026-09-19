@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import SwiftUI
 
 /// The floating capsule that appears while you hold the key.
@@ -37,13 +38,16 @@ final class HUDPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    /// Parks the panel just above the Dock, horizontally centered on the active screen.
+    /// Parks the panel just above the Dock, horizontally centered on the screen holding the
+    /// frontmost app's focused window.
     ///
     /// `NSScreen.main` is the screen with the *key window* — and an accessory app with a
-    /// non-activating panel never has one, so it can be nil. Falling back to `screens.first`
-    /// keeps the HUD on-screen instead of stranding it at the origin.
+    /// non-activating panel never has one, so it's useless here. The HUD needs to track
+    /// wherever the user is actually dictating into, which on a multi-monitor setup is
+    /// whatever screen the target app's window sits on, not the display holding the menu
+    /// bar. Falls back to the menu-bar screen, then `screens.first`, if AX lookup fails.
     func reposition() {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else {
+        guard let screen = HUDPanel.frontmostWindowScreen() ?? NSScreen.main ?? NSScreen.screens.first else {
             Log.app.error("no screen available to position HUD")
             return
         }
@@ -55,6 +59,39 @@ final class HUDPanel: NSPanel {
                 y: visible.minY + 96
             )
         )
+    }
+
+    /// The screen holding the frontmost app's focused window, via the Accessibility API
+    /// (already granted — `TextInjector` depends on the same permission).
+    private static func frontmostWindowScreen() -> NSScreen? {
+        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return nil }
+        let app = AXUIElementCreateApplication(pid)
+
+        var windowRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
+              let windowRef else { return nil }
+        let window = unsafeDowncast(windowRef as AnyObject, to: AXUIElement.self)
+
+        var positionRef: CFTypeRef?
+        var sizeRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionRef) == .success,
+              AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeRef) == .success,
+              let positionRef, let sizeRef else { return nil }
+
+        var position = CGPoint.zero
+        var size = CGSize.zero
+        guard AXValueGetValue(positionRef as! AXValue, .cgPoint, &position),
+              AXValueGetValue(sizeRef as! AXValue, .cgSize, &size) else { return nil }
+
+        // AX coordinates are top-left-origin, screen-down; NSScreen frames are
+        // bottom-left-origin, screen-up. Flip against the primary screen's height.
+        guard let primaryHeight = NSScreen.screens.first?.frame.height else { return nil }
+        let center = NSPoint(
+            x: position.x + size.width / 2,
+            y: primaryHeight - (position.y + size.height / 2)
+        )
+
+        return NSScreen.screens.first { $0.frame.contains(center) }
     }
 
     func present() {
