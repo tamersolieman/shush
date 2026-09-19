@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import ServiceManagement
 import SwiftUI
 
 /// Which appearance the app draws in — independent of the system setting, since the Pencil
@@ -218,6 +219,23 @@ final class Settings {
     /// the Drive copy with one shared timestamp rather than one per field. Not itself synced.
     var settingsLastModified: Date {
         didSet { defaults.set(settingsLastModified, forKey: Keys.settingsLastModified) }
+    }
+
+    /// Backed by `SMAppService`, not `UserDefaults` — the OS is the source of truth (Login
+    /// Items in System Settings can toggle it too), so there's nothing to persist here.
+    var launchAtLogin: Bool {
+        get { SMAppService.mainApp.status == .enabled }
+        set {
+            do {
+                if newValue {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                Log.app.error("Launch at Login toggle failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     private let defaults = UserDefaults.standard

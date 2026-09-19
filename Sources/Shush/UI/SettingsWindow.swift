@@ -5,6 +5,75 @@ import ShushDictionary
 import Speech
 import SwiftUI
 
+/// One settings section, as a destination in the main window's sidebar. Order here is the
+/// order sub-items appear under the sidebar's "Settings" group.
+enum SettingsSection: String, CaseIterable, Identifiable {
+    case general, account, appearance, dictation, model, speechRecognition, transcription, audio, cleanup, history, about
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .account: "Account"
+        case .appearance: "Appearance"
+        case .dictation: "Dictation"
+        case .model: "Model"
+        case .speechRecognition: "Speech Recognition"
+        case .transcription: "Transcription"
+        case .audio: "Audio"
+        case .cleanup: "Cleanup"
+        case .history: "History"
+        case .about: "About"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .general: "switch.2"
+        case .account: "person.crop.circle"
+        case .appearance: "paintbrush"
+        case .dictation: "keyboard"
+        case .model: "cpu"
+        case .speechRecognition: "waveform"
+        case .transcription: "text.bubble"
+        case .audio: "speaker.wave.2"
+        case .cleanup: "sparkles"
+        case .history: "clock.arrow.circlepath"
+        case .about: "info.circle"
+        }
+    }
+}
+
+/// One section's settings, shown as a single always-open card — the main window's sidebar
+/// already picked this section, so there's nothing left to collapse.
+struct SettingsSectionPage: View {
+    @Bindable var controller: DictationController
+    let section: SettingsSection
+    @State private var settings = Settings.shared
+
+    var body: some View {
+        ScrollView {
+            SettingsCard(title: section.title) {
+                switch section {
+                case .general: GeneralSection(settings: settings)
+                case .account: AccountSection(settings: settings)
+                case .appearance: AppearanceSection(settings: settings)
+                case .dictation: DictationSection(controller: controller, settings: settings)
+                case .model: ModelSection(settings: settings)
+                case .speechRecognition: SpeechRecognitionSection(settings: settings)
+                case .transcription: TranscriptionSection(settings: settings)
+                case .audio: AudioSection(settings: settings)
+                case .cleanup: CleanupSection(settings: settings)
+                case .history: HistorySection(settings: settings)
+                case .about: AboutSection(settings: settings)
+                }
+            }
+            .padding(DS.Space.panel)
+        }
+    }
+}
+
 /// Settings, embedded both as a sidebar page in the main window and — for the standard
 /// ⌘, shortcut — its own window. Each section is its own collapsible card (background,
 /// border, tappable header) rather than a flat run of rows, so a screen with this many
@@ -16,6 +85,9 @@ struct SettingsPageView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Space.base) {
+                CollapsibleSection(title: "General", id: "general") {
+                    GeneralSection(settings: settings)
+                }
                 CollapsibleSection(title: "Account", id: "account") {
                     AccountSection(settings: settings)
                 }
@@ -120,6 +192,33 @@ private struct CollapsibleSection<Content: View>: View {
     }
 }
 
+/// Same card chrome as `CollapsibleSection` but always open and without the tappable
+/// header — used where navigation (the sidebar) already identifies the section, so
+/// collapsing it would just hide the thing you came here to see.
+private struct SettingsCard<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title.uppercased())
+                .font(DS.Font.sectionHeader)
+                .foregroundStyle(DS.Color.textPrimary)
+                .padding(.horizontal, DS.Space.base)
+                .frame(height: 44, alignment: .leading)
+            CardDivider()
+            VStack(alignment: .leading, spacing: 0) {
+                content
+            }
+        }
+        .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.Radius.card)
+                .strokeBorder(DS.Color.border, lineWidth: DS.Border.hairline)
+        )
+    }
+}
+
 private struct SettingsRow<Control: View>: View {
     let title: String
     var value: String?
@@ -175,6 +274,16 @@ private struct ToggleRow: View {
                 .toggleStyle(.switch)
                 .tint(DS.Color.primary)
         }
+    }
+}
+
+// MARK: - General
+
+private struct GeneralSection: View {
+    @Bindable var settings: Settings
+
+    var body: some View {
+        ToggleRow(title: "Launch at Login", isOn: $settings.launchAtLogin)
     }
 }
 

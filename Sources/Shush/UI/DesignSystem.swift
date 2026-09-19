@@ -158,7 +158,9 @@ struct BrandMark: View {
 /// Menu bar glyph — a template image so AppKit tints it to match the light/dark menu bar,
 /// same as any SF Symbol would.
 struct StatusBarIcon: View {
-    private static let image: NSImage? = {
+    /// Shared with the manual `NSStatusItem` in `AppDelegate`, which needs the raw image to
+    /// set on its button directly rather than through a SwiftUI label.
+    static let image: NSImage? = {
         guard let url = Bundle.main.url(forResource: "StatusBarIcon", withExtension: "png"),
               let image = NSImage(contentsOf: url) else { return nil }
         image.isTemplate = true

@@ -11,6 +11,7 @@ struct MainWindow: View {
     @State private var settings = Settings.shared
 
     @State private var section: Section = .dashboard
+    @State private var settingsSection: SettingsSection = .general
     @State private var sidebarVisible = true
 
     enum Section: String, CaseIterable, Identifiable {
@@ -37,8 +38,8 @@ struct MainWindow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            Sidebar(section: $section, isCollapsed: !sidebarVisible)
-            ContentArea(controller: controller, section: section)
+            Sidebar(section: $section, settingsSection: $settingsSection, isCollapsed: !sidebarVisible)
+            ContentArea(controller: controller, section: section, settingsSection: settingsSection)
         }
         .animation(DS.Motion.base, value: sidebarVisible)
         // 960 was enough for the dashboard's old 3-card layout; the 5-tile KPI strip plus a
@@ -64,21 +65,35 @@ struct MainWindow: View {
 
 private struct Sidebar: View {
     @Binding var section: MainWindow.Section
+    @Binding var settingsSection: SettingsSection
     /// Collapsed keeps every nav item as an icon-only rail instead of hiding the sidebar
     /// outright — same idea as Xcode/Mail's collapsed sidebar.
     let isCollapsed: Bool
 
     var body: some View {
         VStack(alignment: isCollapsed ? .center : .leading, spacing: DS.Space.section) {
-            BrandMark()
-                .frame(width: 28, height: 28)
+            HStack(spacing: DS.Space.snug) {
+                BrandMark()
+                    .frame(width: 28, height: 28)
+                if !isCollapsed {
+                    Text("Shush")
+                        .font(DS.Font.logo)
+                        .foregroundStyle(DS.Color.textPrimary)
+                }
+            }
 
             VStack(alignment: isCollapsed ? .center : .leading, spacing: DS.Space.snug) {
-                ForEach(MainWindow.Section.allCases) { candidate in
+                ForEach(MainWindow.Section.allCases.filter { $0 != .settings }) { candidate in
                     NavRow(section: candidate, isSelected: section == candidate, isCollapsed: isCollapsed) {
                         section = candidate
                     }
                 }
+                SettingsNavGroup(
+                    isGroupSelected: section == .settings,
+                    settingsSection: $settingsSection,
+                    isCollapsed: isCollapsed,
+                    onSelectGroup: { section = .settings }
+                )
             }
 
             Spacer()
@@ -87,6 +102,93 @@ private struct Sidebar: View {
         .frame(width: isCollapsed ? 64 : 240)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(DS.Color.sidebarBackground)
+    }
+}
+
+/// The "Settings" nav row, expandable into one sub-row per `SettingsSection` — so picking
+/// "which part of Settings to change" happens in the sidebar instead of scrolling a long
+/// page of stacked cards.
+private struct SettingsNavGroup: View {
+    let isGroupSelected: Bool
+    @Binding var settingsSection: SettingsSection
+    let isCollapsed: Bool
+    let onSelectGroup: () -> Void
+
+    @State private var isExpanded = true
+
+    var body: some View {
+        VStack(alignment: isCollapsed ? .center : .leading, spacing: DS.Space.tight) {
+            Button {
+                onSelectGroup()
+                if !isCollapsed {
+                    withAnimation(DS.Motion.fast) { isExpanded.toggle() }
+                }
+            } label: {
+                HStack(spacing: DS.Space.base) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(isGroupSelected ? DS.Color.primary : DS.Color.textSecondary)
+                        .frame(width: 16)
+                    if !isCollapsed {
+                        Text("Settings")
+                            .font(DS.Font.navLabel)
+                            .foregroundStyle(isGroupSelected ? DS.Color.primary : DS.Color.textPrimary)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(DS.Color.textSecondary)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    }
+                }
+                .padding(.horizontal, DS.Space.base)
+                .frame(height: 40)
+                .frame(maxWidth: isCollapsed ? nil : .infinity)
+                .background(isGroupSelected && isCollapsed ? DS.Color.primaryLight : .clear, in: .rect(cornerRadius: DS.Radius.control))
+            }
+            .buttonStyle(.plain)
+            .help("Settings")
+
+            if isExpanded, !isCollapsed {
+                VStack(alignment: .leading, spacing: DS.Space.tight) {
+                    ForEach(SettingsSection.allCases) { candidate in
+                        SettingsSubNavRow(
+                            settingsSection: candidate,
+                            isSelected: isGroupSelected && settingsSection == candidate
+                        ) {
+                            settingsSection = candidate
+                            onSelectGroup()
+                        }
+                    }
+                }
+                .padding(.leading, DS.Space.roomy)
+            }
+        }
+    }
+}
+
+private struct SettingsSubNavRow: View {
+    let settingsSection: SettingsSection
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: DS.Space.snug) {
+                Image(systemName: settingsSection.icon)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isSelected ? DS.Color.primary : DS.Color.textSecondary)
+                    .frame(width: 14)
+                Text(settingsSection.title)
+                    .font(DS.Font.navLabel)
+                    .foregroundStyle(isSelected ? DS.Color.primary : DS.Color.textPrimary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, DS.Space.base)
+            .frame(height: 32)
+            .frame(maxWidth: .infinity)
+            .background(isSelected ? DS.Color.primaryLight : .clear, in: .rect(cornerRadius: DS.Radius.control))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -125,16 +227,17 @@ private struct NavRow: View {
 private struct ContentArea: View {
     @Bindable var controller: DictationController
     let section: MainWindow.Section
+    let settingsSection: SettingsSection
 
     var body: some View {
         VStack(spacing: 0) {
-            TopBar(controller: controller, section: section)
+            TopBar(controller: controller, section: section, settingsSection: settingsSection)
 
             switch section {
             case .dashboard: StatsDashboard()
             case .transcripts: TranscriptionsPage(controller: controller)
             case .dictionary: DictionaryPanel()
-            case .settings: SettingsPageView(controller: controller)
+            case .settings: SettingsSectionPage(controller: controller, section: settingsSection)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -145,10 +248,11 @@ private struct ContentArea: View {
 private struct TopBar: View {
     @Bindable var controller: DictationController
     let section: MainWindow.Section
+    let settingsSection: SettingsSection
 
     var body: some View {
         HStack {
-            Text(section.title)
+            Text(section == .settings ? settingsSection.title : section.title)
                 .font(DS.Font.pageTitle)
                 .foregroundStyle(DS.Color.textPrimary)
 

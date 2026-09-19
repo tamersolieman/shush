@@ -4,12 +4,21 @@ import SwiftUI
 @main
 struct ShushApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some Scene {
         // The main window. A `Window` rather than a `WindowGroup`: this app has one front
         // panel, and letting ⌘N spawn a second copy of a tape deck makes no sense.
         Window("Shush", id: "main") {
             MainWindow(controller: delegate.controller)
+                // Hands the delegate a way to reopen this window/settings from the status
+                // item — `openWindow`/`openSettings` only exist in SwiftUI's environment,
+                // not in AppKit code.
+                .onAppear {
+                    delegate.openMainWindow = { openWindow(id: "main") }
+                    delegate.openSettingsWindow = { openSettings() }
+                }
         }
         .defaultSize(width: 860, height: 620)
         .windowResizability(.contentMinSize)
@@ -27,14 +36,6 @@ struct ShushApp: App {
         SwiftUI.Settings {
             SettingsWindow(controller: delegate.controller)
         }
-
-        // Secondary now: status and the hotkey while you're working in another app.
-        MenuBarExtra {
-            MenuContent(controller: delegate.controller)
-        } label: {
-            StatusBarIcon()
-                .opacity(delegate.controller.state.isActive ? 1 : 0.55)
-        }
     }
 }
 
@@ -46,6 +47,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Owns the live toast so it isn't deallocated out from under itself — `CorrectionWatcher`
     /// only hands back a detected correction, it doesn't own any UI.
     private var correctionToast: CorrectionToastPanel?
+    private var statusItem: NSStatusItem?
+    /// Set by `ShushApp` once the main window's `onAppear` has fired — AppKit code has no
+    /// direct access to SwiftUI's `openWindow`/`openSettings` environment actions.
+    var openMainWindow: (() -> Void)?
+    var openSettingsWindow: (() -> Void)?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // A regular app now: dock icon, app menu, standard windows. The HUD is still a
@@ -54,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
 
         hud = HUDPanel(controller: controller)
+        setUpStatusItem()
 
         if !controller.activate() {
             Permissions.promptForAccessibility()
@@ -115,11 +122,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// This is a menu-bar-first app — closing the main window should leave the hotkey and
+    /// status item running, not quit. Only `Quit Shush` (menu or ⌘Q) actually terminates.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
+    /// Dock icon click with no visible windows — reopens the main window the same way the
+    /// status item's "Open Shush" does.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows {
+            openMainWindow?()
+        }
+        return true
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         controller.deactivate()
     }
 
-    /// Shows and hides the HUD in step with the controller's state.
+    /// Shows and hides the HUD, and dims the status item icon, in step with the
+    /// controller's state.
     private func observeState() {
         withObservationTracking {
             _ = controller.state
@@ -131,9 +154,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 } else {
                     self.hud?.dismiss()
                 }
+                self.statusItem?.button?.alphaValue = self.controller.state.isActive ? 1 : 0.55
                 self.observeState()
             }
         }
+    }
+
+    private func setUpStatusItem() {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let button = item.button {
+            let image = StatusBarIcon.image ?? NSImage(systemSymbolName: "waveform", accessibilityDescription: nil)
+            image?.isTemplate = true
+            button.image = image
+            button.alphaValue = controller.state.isActive ? 1 : 0.55
+        }
+        item.menu = buildStatusMenu()
+        statusItem = item
+    }
+
+    /// Just "Open Shush" / "Settings" / "Quit" for now — room to grow, but the app's real
+    /// controls live in the main window, not buried in a menu-bar dropdown.
+    private func buildStatusMenu() -> NSMenu {
+        let menu = NSMenu()
+
+        let open = NSMenuItem(title: "Open Shush", action: #selector(openShush), keyEquivalent: "")
+        open.target = self
+        menu.addItem(open)
+
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
+
+        menu.addItem(.separator())
+
+        let quit = NSMenuItem(title: "Quit Shush", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(quit)
+
+        return menu
+    }
+
+    @objc private func openShush() {
+        NSApp.activate(ignoringOtherApps: true)
+        openMainWindow?()
+    }
+
+    @objc private func openSettings() {
+        NSApp.activate(ignoringOtherApps: true)
+        openSettingsWindow?()
     }
 
     private func retryActivation() {
@@ -144,103 +211,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.activate()
             Log.app.info("Accessibility granted — hotkey armed")
         }
-    }
-}
-
-private struct MenuContent: View {
-    @Bindable var controller: DictationController
-    @State private var settings = Settings.shared
-    @State private var isPreloadingParakeet = false
-    @State private var parakeetOnDisk = ParakeetModels.isDownloaded
-    @State private var isPreloadingCohere = false
-    @State private var cohereOnDisk = CohereModels.isDownloaded
-
-    private var parakeetStatus: String {
-        if isPreloadingParakeet { return "Loading Parakeet models…" }
-        // Reflects what's actually on disk, not just what this menu instance has done.
-        return parakeetOnDisk ? "Parakeet models installed ✓" : "Download Parakeet models…"
-    }
-
-    private var cohereStatus: String {
-        if isPreloadingCohere { return "Loading Cohere models…" }
-        return cohereOnDisk ? "Cohere models installed ✓" : "Download Cohere models…"
-    }
-
-    private func preloadParakeet() {
-        guard !isPreloadingParakeet else { return }
-        isPreloadingParakeet = true
-        Task {
-            do {
-                _ = try await ParakeetModels.shared.manager()
-                parakeetOnDisk = ParakeetModels.isDownloaded
-            } catch {
-                Log.speech.error("Parakeet preload failed: \(error.localizedDescription)")
-            }
-            isPreloadingParakeet = false
-        }
-    }
-
-    private func preloadCohere() {
-        guard !isPreloadingCohere else { return }
-        isPreloadingCohere = true
-        Task {
-            do {
-                _ = try await CohereModels.shared.loaded()
-                cohereOnDisk = CohereModels.isDownloaded
-            } catch {
-                Log.speech.error("Cohere preload failed: \(error.localizedDescription)")
-            }
-            isPreloadingCohere = false
-        }
-    }
-
-    var body: some View {
-        Text("Hold \(settings.pushToTalkKey.displayName) to dictate")
-
-        Divider()
-
-        Text("Push-to-talk key: \(settings.pushToTalkKey.displayName)")
-            .foregroundStyle(.secondary)
-
-        Picker("Engine", selection: $settings.engine) {
-            ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
-                Text(choice.displayName).tag(choice)
-            }
-        }
-
-        Toggle("Clean up text", isOn: $settings.cleanupEnabled)
-
-        if settings.cleanupEnabled {
-            Toggle("Smart cleanup (on-device AI)", isOn: $settings.smartCleanup)
-                .disabled(!FoundationModelFormatter.isAvailable)
-            if let reason = FoundationModelFormatter.unavailableReason {
-                Text(reason).font(.caption)
-            }
-        }
-
-        Toggle("Sound", isOn: $settings.soundEnabled)
-
-        Divider()
-
-        // Downloading ~470 MB on the first hold would look like a hang, so offer to do it
-        // deliberately instead.
-        if settings.engine == .parakeet {
-            Button(parakeetStatus) { preloadParakeet() }
-                .disabled(isPreloadingParakeet || parakeetOnDisk)
-        }
-        if settings.engine == .cohere {
-            Button(cohereStatus) { preloadCohere() }
-                .disabled(isPreloadingCohere || cohereOnDisk)
-        }
-
-        if !Permissions.hasAccessibility {
-            Button("Grant Accessibility…") { Permissions.openAccessibilitySettings() }
-        }
-        if !Permissions.hasMicrophone {
-            Button("Grant Microphone…") { Permissions.openMicrophoneSettings() }
-        }
-
-        Button("Quit Shush") { NSApp.terminate(nil) }
-            .keyboardShortcut("q")
     }
 }

@@ -1,71 +1,64 @@
 # Shush
 
-A native macOS push-to-talk dictation app. Hold a key, talk, release — the text lands wherever your cursor is. Everything runs on-device.
+Shush is a native macOS dictation app built around one idea: talking should be as fast as typing, anywhere on your Mac. Hold a key, speak, let go — your words appear right where your cursor already is. No copy-paste, no dedicated window to switch into, no cloud round-trip. It runs quietly in the menu bar, and everything happens on your own machine.
 
-Forked from [per-simmons/murmur-youtube](https://github.com/per-simmons/murmur-youtube) and rebranded/rebuilt from there.
+## The experience
+
+Press and hold your chosen key (or tap it once, if you'd rather toggle recording on and off) from inside any app — Mail, Slack, a code editor, a terminal, a browser form. A small heads-up display appears to show you're being heard. Let go, and a moment later your words are typed exactly where you were working. That's the whole interaction. No app to bring to the front, no menu to click through first.
+
+Shush stays out of the way between dictations. Closing its window doesn't close the app — it keeps living in the menu bar, ready for the next hold of the key, and can launch automatically the moment you log in so it's always there without a second thought.
 
 ## Features
 
-### Dictation
+### Dictation, your way
 
-- **Push-to-talk or toggle mode**, with any key or modifier as the shortcut (not a fixed list — press whatever you want to record with, and it's captured live).
-- **Cancel shortcut** (Escape) — discards the current recording without typing anything.
-- **Mute-while-recording**, **microphone selection**, and **audio feedback** toggles.
-- **Voice activity detection** and **filler-word removal**, plus custom-word controls, in Transcription settings.
-- **Engine comparison mode** — record with every engine at once and see the results side by side (nothing is injected in this mode).
+- **Push-to-talk or toggle mode** — hold to record and release to stop, or press once to start and again to finish, whichever fits how you work.
+- **Any key you like as the shortcut** — there's no fixed list to pick from. Press the key or combination you want, and Shush learns it on the spot.
+- **A cancel shortcut** (Escape) for when you change your mind mid-sentence — nothing gets typed.
+- Fine control over the microphone: choose the input device, mute your speakers while recording so Shush doesn't pick up whatever's playing, and toggle an audio cue for start/stop.
 
-### Speech engines
+### Speech recognition that fits the moment
 
-Three, switchable in Settings:
+Three engines, switchable any time in Settings, so you can trade speed for language coverage as needed:
 
-- **Apple** — macOS 26's on-device `SpeechTranscriber`. Streams text live, no download.
-- **Parakeet** (NVIDIA, via [FluidAudio](https://github.com/FluidInference/FluidAudio)) — batch, resolves on release, ~470 MB model.
-- **Cohere Transcribe** (also via FluidAudio) — the only engine here that covers Arabic, plus French, German, Spanish, Italian, Portuguese, Dutch, Polish, Greek, Japanese, Chinese, Vietnamese, Korean.
+- **Apple's on-device engine** — starts instantly, shows your words as you speak, no download required.
+- **Parakeet** — a higher-accuracy engine for English, resolving your full sentence the moment you release the key.
+- **Cohere Transcribe** — the one to reach for beyond English: covers Arabic along with French, German, Spanish, Italian, Portuguese, Dutch, Polish, Greek, Japanese, Chinese, Vietnamese, and Korean.
 
-### Cleanup, translation, and correction
+Voice activity detection trims silence automatically, and filler words like "um" and "uh" can be stripped out before the text ever reaches you.
 
-- **On-device translation** — translate a non-English dictation to English before it's typed, when a specific source language is selected.
-- **Dictionary** — teach it words and phrases it keeps getting wrong, plus "when you hear X, write Y" corrections. Runs both as a bias pass before transcription and a guaranteed find-and-replace pass after.
-- **Opt-in live-correction learning** — after text is injected, briefly watches the focused field for a hand-corrected word or phrase and offers to save it as a dictionary correction. Off by default; no-ops silently on apps that don't expose Accessibility text (Electron, terminals).
+### Cleanup, translation, and a dictionary that learns
 
-### Dashboard
+- **Automatic cleanup** tidies punctuation and spacing so dictated text reads like it was typed with care.
+- **On-device translation** turns a dictation in another language into English text before it lands, when you tell Shush what language you're speaking.
+- **A personal dictionary** for the words Shush keeps getting wrong — names, jargon, whatever's specific to you — plus simple "when you hear X, write Y" corrections. It biases the engine toward your vocabulary before transcription and double-checks with a find-and-replace pass afterward, so it sticks even when the model second-guesses itself.
+- **Learn from your own corrections** (opt-in) — fix a word right after Shush types it, and it can offer to remember that fix for next time, so the same mistake doesn't happen twice.
 
-- **KPI strip and trend chart** — words per minute, dictionary fixes, total words dictated, computed from your own dictation history.
-- **Per-app usage breakdown** and a **GitHub-style streak calendar**.
-- **History retention settings** and **lifetime stats** that persist independent of the visible transcript history.
+### A dashboard for your own dictation habits
 
-### Sync
+- See your words-per-minute trend, how many dictionary fixes you've needed, and how much you've dictated in total, all pulled from your own history.
+- A breakdown of which apps you dictate into most, and a streak calendar that shows how consistently you've been using it.
+- Decide how long individual transcripts stick around; your lifetime stats keep counting regardless.
 
-- **Google account sign-in with Drive sync** — Settings, the custom Dictionary, and lifetime dashboard stats sync across machines via a private `appDataFolder` in your own Google Drive. Settings and Dictionary are last-write-wins; lifetime stats merge additively per device, so switching machines never erases recorded work.
+### Sync across your Macs
 
-### Interface
+Sign in with Google and Shush keeps your settings, your personal dictionary, and your lifetime stats in step across every Mac you use it on, stored privately in your own Google Drive — nothing shared, nothing third-party. Settings and dictionary changes carry over cleanly between machines, and your usage stats add up rather than overwrite, so switching computers never costs you your history.
 
-- **Sidebar navigation** (collapsible) across Dashboard, Transcripts, Dictionary, and Settings, with Settings sections as collapsible cards.
-- **Light/dark theme**, independent of the system setting.
-- Full visual redesign from a Pencil (pen.dev) design file — flat cards, blue accent, consistent light/dark tokens throughout.
+### Built to stay out of your way
 
-## Requirements
+- A collapsible sidebar takes you between Dashboard, Transcripts, Dictionary, and Settings — and Settings itself is organized into focused sub-pages (General, Account, Appearance, Dictation, Model, Speech Recognition, Transcription, Audio, Cleanup, History, About) rather than one long page to scroll through.
+- Lives in the menu bar with a simple menu — open the app, jump to Settings, or quit — and can launch automatically at login.
+- A clean light/dark theme that you can set independently of your system appearance.
+- A considered visual design, redesigned end-to-end for a consistent look in both themes.
 
-- macOS 26 (Apple's `SpeechTranscriber` requires it)
-- Xcode 26 / Swift 6.2 toolchain
-- Apple Silicon (Parakeet and Cohere Transcribe run on the Neural Engine)
+## Getting started
 
-## Building
+Shush needs **Accessibility** and **Microphone** permission to type into other apps and hear you (System Settings → Privacy & Security) — it'll prompt for both the first time it needs them.
+
+- macOS 26 or later
+- Apple Silicon (for the Parakeet and Cohere Transcribe engines)
 
 ```sh
-make run       # build, sign, install to a staging dir, and launch
-make install   # same, but install to /Applications
-make build     # just build with SwiftPM
-make clean     # remove build artifacts
+make install   # build, sign, and install to /Applications
+make run       # same, but to a staging folder instead — handy for testing a build
 ```
-
-The app needs **Accessibility** and **Microphone** permission (System Settings → Privacy & Security). macOS ties the Accessibility grant to the app's code signature — the Makefile signs with a stable local certificate (`Shush Local Dev`, set up once per machine, not committed) rather than ad-hoc, so the grant survives rebuilds. Without that cert it falls back to ad-hoc signing, which means re-granting Accessibility after every `make install`.
-
-## Architecture
-
-- `Sources/Shush/Core/` — hotkey capture (`HotkeyMonitor`, `KeyRecorder`), audio (`AudioCapture`, `MicrophoneDevices`, `SystemAudio`), the dictation state machine (`DictationController`), text injection.
-- `Sources/Shush/Transcription/` — the `TranscriptionEngine` protocol and its three implementations (`AppleSpeechEngine`, `ParakeetEngine`, `CohereEngine`).
-- `Sources/Shush/Dictionary/` — the dictionary store; the correction/bias logic itself lives in the separate `ShushDictionary` target (`Sources/ShushDictionary/`) so it can be unit tested and shares test vectors with the Windows port.
-- `Sources/Shush/Formatting/` — cleanup (rule-based and on-device LLM) and translation.
-- `Sources/Shush/UI/` — `MainWindow` (sidebar nav: Dashboard / Transcripts / Dictionary / Settings), `DesignSystem` (all color/type/spacing tokens), the floating HUD, the Settings page, the engine-comparison window.
-- `Sources/Shush/Support/` — `Settings` (all persisted preferences), logging, permissions, run history.
