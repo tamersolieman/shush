@@ -41,7 +41,17 @@ endif
 
 DMG := $(STAGE)/$(EXEC).dmg
 
-.PHONY: all build app run install clean icon dmg
+## versions/$(EXEC).dmg is the only DMG pushed to GitHub — anyone can grab the latest
+## release straight from the repo root of that folder. `make release` archives whatever
+## was there before under versions/previous versions/, tagged with the version it shipped
+## as (read from the archive's own VERSION marker, not the new build's Info.plist).
+VERSIONS_DIR  := versions
+ARCHIVE_DIR   := $(VERSIONS_DIR)/previous versions
+RELEASE_DMG   := $(VERSIONS_DIR)/$(EXEC).dmg
+VERSION_FILE  := $(VERSIONS_DIR)/.current_version
+CURRENT_VER   := $(shell /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Resources/Info.plist)
+
+.PHONY: all build app run install clean icon dmg release
 
 all: app
 
@@ -112,6 +122,19 @@ dmg: app
 	@hdiutil create -volname "$(EXEC)" -srcfolder "$(STAGE)/dmg-src" -ov -format UDZO "$(DMG)"
 	@rm -rf "$(STAGE)/dmg-src"
 	@echo "wrote $(DMG)"
+
+## Build a release DMG and publish it to versions/. Use `make release CONFIG=release`
+## for a shipping build — plain `make release` packages whatever CONFIG is set to.
+release: dmg
+	@mkdir -p "$(ARCHIVE_DIR)"
+	@if [ -f "$(RELEASE_DMG)" ]; then \
+		OLDVER=$$(cat "$(VERSION_FILE)" 2>/dev/null || echo unknown); \
+		mv "$(RELEASE_DMG)" "$(ARCHIVE_DIR)/$(EXEC)-$$OLDVER.dmg"; \
+		echo "archived previous build as $(ARCHIVE_DIR)/$(EXEC)-$$OLDVER.dmg"; \
+	fi
+	@cp "$(DMG)" "$(RELEASE_DMG)"
+	@echo "$(CURRENT_VER)" > "$(VERSION_FILE)"
+	@echo "published $(RELEASE_DMG)  [version $(CURRENT_VER)]"
 
 clean:
 	@rm -rf .build "$(STAGE)" "$(SCRATCH)"

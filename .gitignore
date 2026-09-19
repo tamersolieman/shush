@@ -5,3 +5,7 @@
 
 # Google OAuth client secret — see Sources/Shush/Sync/GoogleOAuthSecret.swift
 Sources/Shush/Sync/GoogleOAuthSecret.swift
+
+# Old DMG builds archived by `make release` — only versions/Shush.dmg (the latest) ships to GitHub.
+versions/previous versions/*.dmg
+!versions/previous versions/.gitkeep
