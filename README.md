@@ -62,3 +62,14 @@ Shush needs **Accessibility** and **Microphone** permission to type into other a
 make install   # build, sign, and install to /Applications
 make run       # same, but to a staging folder instead — handy for testing a build
 ```
+
+## Download
+
+[![Download for macOS](docs/download-macos.svg)](https://github.com/tamersolieman/shush/raw/main/versions/Shush.dmg)
+
+`make release` publishes the latest signed DMG to `versions/Shush.dmg` — same file on every
+release, so this link never needs updating. This repo is private, so the link only resolves
+while signed in to a GitHub account with access; there's no public-facing release page.
+
+Universal binary. macOS 26 or later. To build and install a copy from source instead, see
+[Getting started](#getting-started) above.
