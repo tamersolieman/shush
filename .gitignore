@@ -2,6 +2,7 @@
 .swiftpm/
 *.xcodeproj
 .DS_Store
+CLAUDE.md
 
 # Google OAuth client secret — see Sources/Shush/Sync/GoogleOAuthSecret.swift
 Sources/Shush/Sync/GoogleOAuthSecret.swift
