@@ -13,7 +13,21 @@ struct DictionaryPanel: View {
     @State private var editing: DictionaryEntry?
     @State private var isAdding = false
 
+    @State private var justAddedID: UUID?
+
     private var entries: [DictionaryEntry] { store.filtered(by: query) }
+
+    /// Clears the search first: an active filter would hide the entry that was just saved,
+    /// which reads as "it wasn't recorded".
+    private func markAdded(_ entry: DictionaryEntry) {
+        query = ""
+        store.add(entry)
+        justAddedID = entry.id
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            if justAddedID == entry.id { withAnimation(DS.Motion.base) { justAddedID = nil } }
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -45,11 +59,13 @@ struct DictionaryPanel: View {
                         : "Try a different search."
                 )
             } else {
+                ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: DS.Space.base) {
                         ForEach(entries) { entry in
                             DictionaryRow(
                                 entry: entry,
+                                isHighlighted: entry.id == justAddedID,
                                 onEdit: { editing = entry },
                                 onToggle: {
                                     var updated = entry
@@ -63,12 +79,17 @@ struct DictionaryPanel: View {
                     .padding(DS.Space.panel)
                     .padding(.top, 0)
                 }
+                .onChange(of: justAddedID) { _, id in
+                    guard let id else { return }
+                    withAnimation(DS.Motion.base) { proxy.scrollTo(id, anchor: .top) }
+                }
+                }
             }
 
             footer
         }
         .sheet(isPresented: $isAdding) {
-            DictionaryEditor(entry: nil) { store.add($0) }
+            DictionaryEditor(entry: nil) { markAdded($0) }
         }
         .sheet(item: $editing) { entry in
             DictionaryEditor(entry: entry) { store.update($0) }
@@ -79,9 +100,9 @@ struct DictionaryPanel: View {
     /// the UI — which is only true if you can find it.
     private var footer: some View {
         HStack(spacing: DS.Space.snug) {
-            Text("\(store.entries.count) entries")
+            Text(justAddedID == nil ? "\(store.entries.count) entries" : "Saved · \(store.entries.count) entries")
                 .font(DS.Font.meta)
-                .foregroundStyle(DS.Color.textTertiary)
+                .foregroundStyle(justAddedID == nil ? DS.Color.textTertiary : DS.Color.primary)
             Spacer()
             Button {
                 NSWorkspace.shared.activateFileViewerSelecting([DictionaryStore.fileURL])
@@ -105,6 +126,7 @@ struct DictionaryPanel: View {
 
 private struct DictionaryRow: View {
     let entry: DictionaryEntry
+    let isHighlighted: Bool
     let onEdit: () -> Void
     let onToggle: () -> Void
     let onDelete: () -> Void
@@ -146,7 +168,7 @@ private struct DictionaryRow: View {
         }
         .opacity(entry.isEnabled ? 1 : 0.5)
         .padding(DS.Space.roomy)
-        .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.card))
+        .background(isHighlighted ? DS.Color.primaryLight : DS.Color.surface, in: .rect(cornerRadius: DS.Radius.card))
         .onHover { isHovering = $0 }
     }
 

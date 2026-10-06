@@ -137,6 +137,10 @@ final class Settings {
     /// the edit looks like a targeted word/phrase fix, offers to save it as a dictionary
     /// correction. Off by default — unlike most toggles here, this reads live text out of
     /// whatever app you're using right after Shush's own UI loses relevance, so it's opt-in.
+    var polishWriting: Bool {
+        didSet { defaults.set(polishWriting, forKey: Keys.polishWriting) }
+    }
+
     var learnFromCorrectionsEnabled: Bool {
         didSet { defaults.set(learnFromCorrectionsEnabled, forKey: Keys.learnFromCorrectionsEnabled); markDirtyForSync() }
     }
@@ -247,6 +251,7 @@ final class Settings {
         static let soundEnabled = "soundEnabled"
         static let vadEnabled = "vadEnabled"
         static let removeFillerWords = "removeFillerWords"
+        static let polishWriting = "polishWriting"
         static let learnFromCorrectionsEnabled = "learnFromCorrectionsEnabled"
         static let engine = "engine"
         static let smartCleanup = "smartCleanup"
@@ -280,6 +285,7 @@ final class Settings {
         soundEnabled = defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true
         vadEnabled = defaults.object(forKey: Keys.vadEnabled) as? Bool ?? true
         removeFillerWords = defaults.object(forKey: Keys.removeFillerWords) as? Bool ?? true
+        polishWriting = defaults.object(forKey: Keys.polishWriting) as? Bool ?? true
         learnFromCorrectionsEnabled = defaults.object(forKey: Keys.learnFromCorrectionsEnabled) as? Bool ?? false
         speechLanguage = defaults.string(forKey: Keys.speechLanguage) ?? "auto"
         translateToEnglish = defaults.object(forKey: Keys.translateToEnglish) as? Bool ?? false

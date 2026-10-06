@@ -68,7 +68,11 @@ final class DictationController {
         if let formatter { return formatter }
         let removeFillerWords = Settings.shared.removeFillerWords
         return Settings.shared.smartCleanup
-            ? FoundationModelFormatter(removeFillerWords: removeFillerWords)
+            ? FoundationModelFormatter(
+                removeFillerWords: removeFillerWords,
+                polish: Settings.shared.polishWriting,
+                terms: DictionaryStore.shared.biasPhrases
+            )
             : RuleBasedFormatter(removeFillerWords: removeFillerWords)
     }
 

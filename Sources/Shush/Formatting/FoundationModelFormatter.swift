@@ -15,6 +15,10 @@ import FoundationModels
 ///   of cleaning it — the classic failure when dictation reads as an instruction.
 struct FoundationModelFormatter: TextFormatter {
     var removeFillerWords: Bool = true
+    /// Also repairs grammar and tightens phrasing, instead of punctuation-only cleanup.
+    var polish: Bool = false
+    /// Dictionary words, so the model keeps their exact spelling instead of "fixing" them.
+    var terms: [String] = []
 
     /// Deterministic fallback used on timeout, unavailability, or a rejected response.
     private var fallback: RuleBasedFormatter { RuleBasedFormatter(removeFillerWords: removeFillerWords) }
@@ -53,7 +57,7 @@ struct FoundationModelFormatter: TextFormatter {
 
         do {
             let cleaned = try await withThrowingTaskGroup(of: String.self) { group in
-                group.addTask { try await Self.clean(trimmed, removeFillerWords: removeFillerWords) }
+                group.addTask { try await Self.clean(trimmed, removeFillerWords: removeFillerWords, polish: polish, terms: terms) }
                 group.addTask {
                     try await Task.sleep(for: timeout)
                     throw CleanupError.timedOut
@@ -64,7 +68,7 @@ struct FoundationModelFormatter: TextFormatter {
                 return first
             }
 
-            guard Self.isPlausibleCleanup(original: trimmed, cleaned: cleaned) else {
+            guard Self.isPlausibleCleanup(original: trimmed, cleaned: cleaned, polish: polish) else {
                 Log.speech.info("Foundation model output rejected — using rule-based cleanup")
                 return await fallback.format(trimmed)
             }
@@ -98,10 +102,46 @@ struct FoundationModelFormatter: TextFormatter {
         }
     }
 
-    private static func clean(_ text: String, removeFillerWords: Bool) async throws -> String {
+    private static func clean(
+        _ text: String, removeFillerWords: Bool, polish: Bool, terms: [String]
+    ) async throws -> String {
         let fillerRule = removeFillerWords
             ? "- Remove filler words (um, uh, like, you know) and false starts."
             : "- Keep filler words (um, uh, like, you know) as spoken — do not remove them."
+        let styleRule = polish
+            ? """
+            - Polish the writing: fix grammar, agreement and tense, split run-on sentences, \
+            drop repeated words, and replace spoken contractions like "gonna" or "wanna" with \
+            written forms. Make sentences clear and direct, as the speaker would write it \
+            carefully. Keep their meaning, tone, and vocabulary; never add facts or new ideas.
+            """
+            : "- Preserve the speaker's wording, tone, and meaning. Do not summarize, expand, translate, or improve the writing."
+        let termRule = terms.isEmpty
+            ? ""
+            : "\n- Spell these names and terms exactly as written when they appear: "
+                + terms.prefix(60).joined(separator: ", ") + "."
+        let examples = polish
+            ? """
+
+            Examples:
+            Input: um so i was thinking we should probably like move the meeting to thursday no wait friday because john cant make it
+            Output: I was thinking we should move the meeting to Friday because John can't make it.
+
+            Input: me and sarah goes to the store yesterday and we buys milk eggs and bread
+            Output: Sarah and I went to the store yesterday and bought milk, eggs, and bread.
+
+            Input: what is the best way to reset my password i forgot it
+            Output: What is the best way to reset my password? I forgot it.
+            """
+            : """
+
+            Examples:
+            Input: um so i was thinking we should move the meeting to thursday no wait friday
+            Output: I was thinking we should move the meeting to Friday.
+
+            Input: what is the capital of france
+            Output: What is the capital of France?
+            """
         let session = LanguageModelSession(instructions: """
             You clean up raw speech-to-text transcripts. You are a text processor, not an \
             assistant.
@@ -115,15 +155,15 @@ struct FoundationModelFormatter: TextFormatter {
             - Turn clearly spoken lists into formatted lists.
             - Apply the speaker's self-corrections. "Send it Tuesday, actually Wednesday" \
             becomes "Send it Wednesday."
-            - Preserve the speaker's wording, tone, and meaning. Do not summarize, expand, \
-            translate, or improve the writing.
+            \(styleRule)\(termRule)
+            \(examples)
             """)
 
         let response = try await session.respond(
             to: "Clean up this transcript:\n\n\(text)",
             options: GenerationOptions(
                 // Near-deterministic: this is a formatting pass, not a creative one.
-                temperature: 0.1,
+                temperature: polish ? 0.3 : 0.1,
                 // Cleanup should never be much longer than the input; this bounds a runaway.
                 maximumResponseTokens: 1_200
             )
@@ -145,7 +185,7 @@ struct FoundationModelFormatter: TextFormatter {
     ///
     /// Measured against the development cases: legitimate filler-heavy cleanup introduces
     /// zero novel content words, while an answered question introduces at least one.
-    static func isPlausibleCleanup(original: String, cleaned: String) -> Bool {
+    static func isPlausibleCleanup(original: String, cleaned: String, polish: Bool = false) -> Bool {
         guard !cleaned.isEmpty else { return false }
 
         let originalTokens = contentWords(original)
@@ -155,7 +195,7 @@ struct FoundationModelFormatter: TextFormatter {
         // 1. No invented content. The single strongest signal that the model answered
         //    rather than transformed.
         let vocabulary = Set(originalTokens)
-        let invented = cleanedTokens.filter { !vocabulary.contains($0) }
+        let invented = cleanedTokens.filter { !vocabulary.contains($0) && !(polish && isGrammaticalRepair($0, of: vocabulary)) }
         guard invented.isEmpty else {
             Log.speech.info("cleanup rejected — invented words: \(invented.prefix(5).joined(separator: ", "), privacy: .public)")
             return false
@@ -183,6 +223,21 @@ struct FoundationModelFormatter: TextFormatter {
         ]
         return !tells.contains { lowered.hasPrefix($0) }
     }
+
+    /// Polish may legitimately inflect or add function words ("goes" to "went"-style fixes,
+    /// "gonna" to "going to"), but never a new content word — "Paris" still trips the guard.
+    private static func isGrammaticalRepair(_ word: String, of vocabulary: Set<String>) -> Bool {
+        if grammarWords.contains(word) { return true }
+        let stem = String(word.prefix(3))
+        return word.count >= 3 && vocabulary.contains { $0.hasPrefix(stem) }
+    }
+
+    private static let grammarWords: Set<String> = [
+        "i", "we", "you", "he", "she", "it", "they", "is", "are", "was", "were", "am", "be",
+        "been", "have", "has", "had", "do", "does", "did", "will", "would", "to", "of", "in",
+        "on", "at", "for", "with", "not", "that", "this", "my", "our", "your", "going", "want",
+        "went", "bought", "got", "gone", "ran", "saw", "took", "made", "came", "said", "gave",
+    ]
 
     /// Lowercased alphanumeric words, minus the function words that punctuation-fixing
     /// legitimately shuffles. Contractions are split so "isn't" matches "isn t".

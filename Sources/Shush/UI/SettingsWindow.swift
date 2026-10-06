@@ -441,12 +441,20 @@ private struct TranscriptionSection: View {
     @Bindable var settings: Settings
     @State private var store = DictionaryStore.shared
     @State private var newWord = ""
+    @State private var lastAdded: String?
 
     var body: some View {
         ToggleRow(title: "Voice Activity Detection", isOn: $settings.vadEnabled)
         RowSubtitle(
             "Filter silence from recordings. Streaming-capable models use a longer VAD "
                 + "tail; disabling VAD records raw audio."
+        )
+        CardDivider()
+
+        ToggleRow(title: "Polish Writing", isOn: $settings.polishWriting)
+        RowSubtitle(
+            "Fixes grammar and run-on sentences and tightens phrasing, keeping your meaning "
+                + "and voice. Needs Smart Cleanup. Turn off for punctuation-only cleanup."
         )
         CardDivider()
 
@@ -501,13 +509,24 @@ private struct TranscriptionSection: View {
         }
         .padding(.horizontal, DS.Space.base)
         .padding(.vertical, DS.Space.base)
+
+        if let lastAdded {
+            Text("Saved “\(lastAdded)” · \(store.entries.count) in dictionary")
+                .font(DS.Font.meta)
+                .foregroundStyle(DS.Color.primary)
+                .padding(.horizontal, DS.Space.base)
+                .padding(.bottom, DS.Space.base)
+        }
     }
 
     private func addWord() {
         let word = newWord.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !word.isEmpty else { return }
-        store.add(.term(word))
+        if !store.entries.contains(where: { $0.kind == .term && $0.write.caseInsensitiveCompare(word) == .orderedSame }) {
+            store.add(.term(word))
+        }
         newWord = ""
+        lastAdded = word
     }
 }
 

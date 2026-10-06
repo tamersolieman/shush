@@ -50,7 +50,7 @@ final class DictionaryStore {
     // MARK: - Editing
 
     func add(_ entry: DictionaryEntry) {
-        entries.append(entry)
+        entries.insert(entry, at: 0)
         save()
     }
 
