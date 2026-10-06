@@ -30,8 +30,9 @@ Voice activity detection trims silence automatically, and filler words like "um"
 ### Cleanup, translation, and a dictionary that learns
 
 - **Automatic cleanup** tidies punctuation and spacing so dictated text reads like it was typed with care.
+- **Polish Writing** goes a step further with the on-device model: it fixes grammar, splits run-on sentences, and tightens phrasing while keeping your meaning and voice. It sees your dictionary terms so names stay spelled right, and a guard rejects any output that invents words you never said. Turn it off for punctuation-only cleanup.
 - **On-device translation** turns a dictation in another language into English text before it lands, when you tell Shush what language you're speaking.
-- **A personal dictionary** for the words Shush keeps getting wrong — names, jargon, whatever's specific to you — plus simple "when you hear X, write Y" corrections. It biases the engine toward your vocabulary before transcription and double-checks with a find-and-replace pass afterward, so it sticks even when the model second-guesses itself.
+- **A personal dictionary** for the words Shush keeps getting wrong — names, jargon, whatever's specific to you — plus simple "when you hear X, write Y" corrections. New entries jump to the top of the list and confirm they were saved. It biases the engine toward your vocabulary before transcription and double-checks with a find-and-replace pass afterward, so it sticks even when the model second-guesses itself.
 - **Learn from your own corrections** (opt-in) — fix a word right after Shush types it, and it can offer to remember that fix for next time, so the same mistake doesn't happen twice.
 
 ### A dashboard for your own dictation habits
