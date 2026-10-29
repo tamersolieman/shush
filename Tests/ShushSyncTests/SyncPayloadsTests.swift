@@ -10,7 +10,6 @@ struct SyncPayloadCodecTests {
             pushToTalkKeyData: Data([1, 2, 3]),
             pushToTalkEnabled: true,
             engine: "apple",
-            compareMode: false,
             cleanupEnabled: true,
             smartCleanup: false,
             soundEnabled: true,

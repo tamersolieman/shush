@@ -309,20 +309,31 @@ final class DictationController {
                 return
             }
 
-            let cleaned = Settings.shared.cleanupEnabled
-                ? await activeFormatter.format(raw)
-                : raw
+            // A snippet cue is matched on the raw transcript and its text typed verbatim —
+            // cleanup, the dictionary and translation would all rewrite a link or a signature.
+            let snippet = SnippetStore.shared.match(raw)
+            var output: String
+            var corrections: [AppliedCorrection] = []
 
-            // The dictionary runs last, and runs regardless of the cleanup setting. Biasing
-            // only raises the odds of the right word; this is the pass that guarantees it,
-            // so it must not be something the user can accidentally switch off.
-            var (output, corrections) = DictionaryStore.shared.corrector.apply(to: cleaned)
-            if !corrections.isEmpty {
-                Log.speech.info("dictionary · \(corrections.count, privacy: .public) correction(s) applied")
-            }
+            if let snippet {
+                Log.speech.info("snippet · cue expanded")
+                output = snippet.text
+            } else {
+                let cleaned = Settings.shared.cleanupEnabled
+                    ? await activeFormatter.format(raw)
+                    : raw
 
-            if Settings.shared.translateToEnglish {
-                output = await Translator.translateToEnglish(output, sourceIdentifier: Settings.shared.speechLanguage)
+                // The dictionary runs last, and runs regardless of the cleanup setting. Biasing
+                // only raises the odds of the right word; this is the pass that guarantees it,
+                // so it must not be something the user can accidentally switch off.
+                (output, corrections) = DictionaryStore.shared.corrector.apply(to: cleaned)
+                if !corrections.isEmpty {
+                    Log.speech.info("dictionary · \(corrections.count, privacy: .public) correction(s) applied")
+                }
+
+                if Settings.shared.translateToEnglish {
+                    output = await Translator.translateToEnglish(output, sourceIdentifier: Settings.shared.speechLanguage)
+                }
             }
 
             // Captured right before injection, not at hold-start: the HUD is a
@@ -331,7 +342,7 @@ final class DictationController {
             let target = NSWorkspace.shared.frontmostApplication
             recordRun(text: output, corrections: corrections, appName: target?.localizedName, appBundleID: target?.bundleIdentifier)
             TextInjector.insert(output)
-            if Settings.shared.learnFromCorrectionsEnabled && Permissions.hasAccessibility {
+            if snippet == nil && Settings.shared.learnFromCorrectionsEnabled && Permissions.hasAccessibility {
                 CorrectionWatcher.shared.observe(injected: output, target: target)
             }
             if Settings.shared.soundEnabled { NSSound(named: "Pop")?.play() }

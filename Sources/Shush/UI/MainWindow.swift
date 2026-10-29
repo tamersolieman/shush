@@ -15,7 +15,7 @@ struct MainWindow: View {
     @State private var sidebarVisible = true
 
     enum Section: String, CaseIterable, Identifiable {
-        case dashboard, transcripts, dictionary, settings
+        case dashboard, transcripts, dictionary, snippets, settings
 
         var id: String { rawValue }
         var title: String {
@@ -23,6 +23,7 @@ struct MainWindow: View {
             case .dashboard: "Dashboard"
             case .transcripts: "Transcripts"
             case .dictionary: "Dictionary"
+            case .snippets: "Snippets"
             case .settings: "Settings"
             }
         }
@@ -31,6 +32,7 @@ struct MainWindow: View {
             case .dashboard: "square.grid.2x2"
             case .transcripts: "text.bubble"
             case .dictionary: "book.closed"
+            case .snippets: "text.badge.plus"
             case .settings: "gearshape"
             }
         }
@@ -237,6 +239,7 @@ private struct ContentArea: View {
             case .dashboard: StatsDashboard()
             case .transcripts: TranscriptionsPage(controller: controller)
             case .dictionary: DictionaryPanel()
+            case .snippets: SnippetsPanel()
             case .settings: SettingsSectionPage(controller: controller, section: settingsSection)
             }
         }
@@ -261,9 +264,7 @@ private struct TopBar: View {
             switch section {
             case .dashboard, .transcripts:
                 RecordControl(controller: controller)
-            case .dictionary:
-                EmptyView()
-            case .settings:
+            case .dictionary, .snippets, .settings:
                 EmptyView()
             }
         }

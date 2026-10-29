@@ -33,6 +33,7 @@ Voice activity detection trims silence automatically, and filler words like "um"
 - **Polish Writing** goes a step further with the on-device model: it fixes grammar, splits run-on sentences, and tightens phrasing while keeping your meaning and voice. It sees your dictionary terms so names stay spelled right, and a guard rejects any output that invents words you never said. Turn it off for punctuation-only cleanup.
 - **On-device translation** turns a dictation in another language into English text before it lands, when you tell Shush what language you're speaking.
 - **A personal dictionary** for the words Shush keeps getting wrong — names, jargon, whatever's specific to you — plus simple "when you hear X, write Y" corrections. New entries jump to the top of the list and confirm they were saved. It biases the engine toward your vocabulary before transcription and double-checks with a find-and-replace pass afterward, so it sticks even when the model second-guesses itself.
+- **Snippets** — say a short cue like "my calendly" and Shush types the full text instead, whether that's a link, a signature, or a whole intro email. A snippet only fires when the cue is everything you said, so it never rewrites an ordinary sentence. Add them in the app, or import and export a JSON file (`[{"cue": "my calendly", "text": "calendly.com/you"}]`).
 - **Learn from your own corrections** (opt-in) — fix a word right after Shush types it, and it can offer to remember that fix for next time, so the same mistake doesn't happen twice.
 
 ### A dashboard for your own dictation habits
@@ -43,11 +44,11 @@ Voice activity detection trims silence automatically, and filler words like "um"
 
 ### Sync across your Macs
 
-Sign in with Google and Shush keeps your settings, your personal dictionary, and your lifetime stats in step across every Mac you use it on, stored privately in your own Google Drive — nothing shared, nothing third-party. Settings and dictionary changes carry over cleanly between machines, and your usage stats add up rather than overwrite, so switching computers never costs you your history.
+Sign in with Google and Shush keeps your settings, your personal dictionary, your snippets, and your lifetime stats in step across every Mac you use it on, stored privately in your own Google Drive — nothing shared, nothing third-party. Settings and dictionary changes carry over cleanly between machines, and your usage stats add up rather than overwrite, so switching computers never costs you your history.
 
 ### Built to stay out of your way
 
-- A collapsible sidebar takes you between Dashboard, Transcripts, Dictionary, and Settings — and Settings itself is organized into focused sub-pages (General, Account, Appearance, Dictation, Model, Speech Recognition, Transcription, Audio, Cleanup, History, About) rather than one long page to scroll through.
+- A collapsible sidebar takes you between Dashboard, Transcripts, Dictionary, Snippets, and Settings — and Settings itself is organized into focused sub-pages (General, Account, Appearance, Dictation, Model, Speech Recognition, Transcription, Audio, Cleanup, History, About) rather than one long page to scroll through.
 - Lives in the menu bar with a simple menu — open the app, jump to Settings, or quit — and can launch automatically at login.
 - A clean light/dark theme that you can set independently of your system appearance.
 - A considered visual design, redesigned end-to-end for a consistent look in both themes.

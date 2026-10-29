@@ -302,16 +302,30 @@ private struct DictionaryEditor: View {
     }
 
     private func field(_ label: String, text: Binding<String>, prompt: String) -> some View {
+        FormField(label) { TextField(prompt, text: text).frame(height: 32) }
+    }
+}
+
+/// A label above a bordered control, shared by the Dictionary and Snippets editors.
+struct FormField<Content: View>: View {
+    let label: String
+    let content: Content
+
+    init(_ label: String, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.content = content()
+    }
+
+    var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.tight) {
             Text(label)
                 .font(DS.Font.sectionHeader)
                 .foregroundStyle(DS.Color.textTertiary)
-            TextField(prompt, text: text)
+            content
                 .textFieldStyle(.plain)
                 .font(DS.Font.body)
                 .foregroundStyle(DS.Color.textPrimary)
                 .padding(.horizontal, DS.Space.base)
-                .frame(height: 32)
                 .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.control))
                 .overlay(
                     RoundedRectangle(cornerRadius: DS.Radius.control)

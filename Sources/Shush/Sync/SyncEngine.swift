@@ -1,6 +1,7 @@
+import ShushDictionary
 import Foundation
 
-/// Orchestrates push/pull of Settings, Dictionary, and lifetime stats against Drive's
+/// Orchestrates push/pull of Settings, Dictionary, Snippets, and lifetime stats against Drive's
 /// `appDataFolder`. Debounces pushes so rapid edits (e.g. dragging a stepper) don't fire one
 /// request per tick, and pulls on launch plus periodically to pick up other machines' changes.
 @MainActor
@@ -17,6 +18,7 @@ final class SyncEngine {
     private var pullTimer: Task<Void, Never>?
     private var settingsPushTask: Task<Void, Never>?
     private var dictionaryPushTask: Task<Void, Never>?
+    private var snippetsPushTask: Task<Void, Never>?
     private var statsPushTask: Task<Void, Never>?
 
     private static let debounceInterval: Duration = .seconds(3)
@@ -44,6 +46,7 @@ final class SyncEngine {
     func syncNow() async {
         await pushSettings()
         await pushDictionary()
+        await pushSnippets()
         await pushStats()
         await pullAll()
     }
@@ -71,6 +74,16 @@ final class SyncEngine {
             try? await Task.sleep(for: Self.debounceInterval)
             guard !Task.isCancelled else { return }
             await self?.pushDictionary()
+        }
+    }
+
+    func scheduleSnippetsPush() {
+        guard isEnabled else { return }
+        snippetsPushTask?.cancel()
+        snippetsPushTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.debounceInterval)
+            guard !Task.isCancelled else { return }
+            await self?.pushSnippets()
         }
     }
 
@@ -102,6 +115,15 @@ final class SyncEngine {
         await run { try await self.drive.upload(payload, name: "dictionary.json") }
     }
 
+    private func pushSnippets() async {
+        guard isEnabled else { return }
+        let store = SnippetStore.shared
+        // Never saved on this Mac — pushing would replace Drive's copy with an empty list.
+        guard store.lastModified > .distantPast else { return }
+        let payload = SnippetsPayload(updatedAt: store.lastModified, deviceID: DeviceID.value, snippets: store.snippets)
+        await run { try await self.drive.upload(payload, name: "snippets.json") }
+    }
+
     private func pushStats() async {
         guard isEnabled else { return }
         let payload = DeviceStatsPayload(
@@ -118,6 +140,7 @@ final class SyncEngine {
         guard isEnabled else { return }
         await run { try await self.pullSettings() }
         await run { try await self.pullDictionary() }
+        await run { try await self.pullSnippets() }
         await run { try await self.pullStats() }
         Settings.shared.lastSyncDate = .now
     }
@@ -134,6 +157,12 @@ final class SyncEngine {
         guard let remote = try await drive.download(DictionaryPayload.self, name: "dictionary.json") else { return }
         guard remote.updatedAt > DictionaryStore.shared.lastModified else { return }
         DictionaryStore.shared.applyRemote(text: remote.fileText)
+    }
+
+    private func pullSnippets() async throws {
+        guard let remote = try await drive.download(SnippetsPayload.self, name: "snippets.json") else { return }
+        guard remote.updatedAt > SnippetStore.shared.lastModified else { return }
+        SnippetStore.shared.applyRemote(remote.snippets)
     }
 
     private func pullStats() async throws {

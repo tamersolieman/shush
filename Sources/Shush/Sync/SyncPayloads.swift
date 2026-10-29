@@ -1,3 +1,4 @@
+import ShushDictionary
 import Foundation
 
 enum SyncError: LocalizedError {
@@ -49,6 +50,12 @@ struct DictionaryPayload: Codable {
     var updatedAt: Date
     var deviceID: String
     var fileText: String
+}
+
+struct SnippetsPayload: Codable {
+    var updatedAt: Date
+    var deviceID: String
+    var snippets: [Snippet]
 }
 
 struct DeviceStatsPayload: Codable {
