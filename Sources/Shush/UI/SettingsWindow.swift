@@ -708,6 +708,7 @@ private struct AccountSection: View {
     @Bindable var settings: Settings
     @State private var auth = GoogleAuthService.shared
     @State private var isConnecting = false
+    @State private var connectError: String?
 
     var body: some View {
         if let email = settings.googleAccountEmail {
@@ -718,7 +719,20 @@ private struct AccountSection: View {
             }
             CardDivider()
 
-            ToggleRow(title: "Sync Settings, Dictionary & Stats", isOn: $settings.syncEnabled)
+            if auth.needsReconnect {
+                SettingsRow(title: "Sign-in expired") {
+                    Button(isConnecting ? "Connecting…" : "Reconnect") { connect() }
+                        .buttonStyle(.plain)
+                        .font(DS.Font.button)
+                        .foregroundStyle(DS.Color.primary)
+                        .disabled(isConnecting)
+                }
+                RowSubtitle("Google ended this sign-in, so nothing is syncing. Reconnect to resume — nothing on this Mac was lost.", isError: true)
+                if let connectError { RowSubtitle(connectError, isError: true) }
+                CardDivider()
+            }
+
+            ToggleRow(title: "Sync Settings, Dictionary, Snippets, Transcripts & Stats", isOn: $settings.syncEnabled)
             RowSubtitle("Synced via a private, app-only folder in your Google Drive.")
             CardDivider()
 
@@ -739,19 +753,27 @@ private struct AccountSection: View {
             }
         } else {
             SettingsRow(title: "Google Account") {
-                Button(isConnecting ? "Connecting…" : "Connect") {
-                    Task {
-                        isConnecting = true
-                        defer { isConnecting = false }
-                        try? await auth.signIn()
-                    }
-                }
-                .buttonStyle(.plain)
-                .font(DS.Font.button)
-                .foregroundStyle(DS.Color.primary)
-                .disabled(isConnecting)
+                Button(isConnecting ? "Connecting…" : "Connect") { connect() }
+                    .buttonStyle(.plain)
+                    .font(DS.Font.button)
+                    .foregroundStyle(DS.Color.primary)
+                    .disabled(isConnecting)
             }
-            RowSubtitle("Sync Settings, Dictionary and lifetime stats across your Macs via a private, app-only Drive folder.")
+            RowSubtitle("Sync Settings, Dictionary, Snippets, Transcripts and lifetime stats across your Macs via a private, app-only Drive folder.")
+            if let connectError { RowSubtitle(connectError, isError: true) }
+        }
+    }
+
+    private func connect() {
+        Task {
+            isConnecting = true
+            defer { isConnecting = false }
+            do {
+                try await auth.signIn()
+                connectError = nil
+            } catch {
+                connectError = error.localizedDescription
+            }
         }
     }
 

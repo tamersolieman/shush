@@ -205,7 +205,10 @@ final class Settings {
     /// Master switch for Drive sync, independent of sign-in — a signed-in user can pause
     /// syncing without disconnecting the account.
     var syncEnabled: Bool {
-        didSet { defaults.set(syncEnabled, forKey: Keys.syncEnabled) }
+        didSet {
+            defaults.set(syncEnabled, forKey: Keys.syncEnabled)
+            if syncEnabled && !oldValue { Task { await SyncEngine.shared.syncNow() } }
+        }
     }
 
     /// When the last successful sync completed, for the Account section's subtitle.

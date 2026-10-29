@@ -85,12 +85,9 @@ final class DictionaryStore {
 
     var biasPhrases: [String] { DictionaryCorrector.biasPhrases(from: entries) }
 
-    /// The file's modification time, for `SyncEngine`'s last-write-wins comparison against the
-    /// Drive copy's `updatedAt` — no separate stored timestamp needed, the filesystem already
-    /// has this.
-    var lastModified: Date {
-        (try? FileManager.default.attributesOfItem(atPath: Self.fileURL.path)[.modificationDate] as? Date) ?? .distantPast
-    }
+    /// Whether anything has ever been saved here, so a fresh Mac doesn't count as having data
+    /// to contribute to its first sync.
+    var hasFile: Bool { FileManager.default.fileExists(atPath: Self.fileURL.path) }
 
     /// Writes text pulled from Drive straight to disk, reusing the existing `isSaving` guard so
     /// the file watcher doesn't mistake this for an external hand-edit and re-push it.
@@ -99,6 +96,13 @@ final class DictionaryStore {
         defer { isSaving = false }
         try? text.write(to: Self.fileURL, atomically: true, encoding: .utf8)
         load()
+    }
+
+    /// Folds the Drive copy into this one when both changed since they last agreed. Goes
+    /// through `save()`, so the result is written locally like any other edit.
+    func merge(remoteText: String) {
+        entries = DictionaryEntry.union(local: entries, remote: Self.parse(remoteText))
+        save()
     }
 
     // MARK: - Persistence

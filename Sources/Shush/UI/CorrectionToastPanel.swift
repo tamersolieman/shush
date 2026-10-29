@@ -12,6 +12,10 @@ final class CorrectionToastPanel: NSPanel {
 
     private static let size = NSSize(width: 360, height: 118)
     private static let autoDismiss: Duration = .seconds(8)
+    private static let gap: CGFloat = 8
+    /// Above this height a field is a pane (an editor, a long compose box), and "above the
+    /// field" would be nowhere near where the text landed — anchor on the caret line instead.
+    private static let tallField: CGFloat = 200
 
     init(correction: CorrectionDiff.Correction, onSave: @escaping () -> Void, onDismiss: @escaping () -> Void) {
         super.init(
@@ -48,11 +52,12 @@ final class CorrectionToastPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    /// Places the toast just below the edited element, using its AX-reported screen rect
-    /// when readable; falls back to `HUDPanel`'s above-the-Dock spot otherwise, so an
-    /// unpositionable toast still lands somewhere predictable rather than at the origin.
+    /// Places the toast just above the edited element, on whichever display that element is
+    /// on, using its AX-reported screen rect. When the rect is unreadable it falls back to
+    /// the display under the mouse, so the toast still lands on the screen being worked on
+    /// rather than at the origin or on another monitor.
     func present(near element: AXUIElement) {
-        setFrameOrigin(originNear(element) ?? aboveDockOrigin())
+        setFrameOrigin(origin(near: element) ?? fallbackOrigin())
 
         alphaValue = 0
         orderFrontRegardless()
@@ -80,23 +85,56 @@ final class CorrectionToastPanel: NSPanel {
         }
     }
 
-    private func originNear(_ element: AXUIElement) -> NSPoint? {
-        guard let axPosition = axValue(element, kAXPositionAttribute, .cgPoint, CGPoint.self),
-              let axSize = axValue(element, kAXSizeAttribute, .cgSize, CGSize.self),
-              let screen = NSScreen.screens.first
+    private func origin(near element: AXUIElement) -> NSPoint? {
+        guard var anchor = appKitRect(of: element) else { return nil }
+        if anchor.height > Self.tallField, let caret = caretRect(of: element) { anchor = caret }
+
+        // The display is whichever one holds the field's centre, not the primary one.
+        let centre = NSPoint(x: anchor.midX, y: anchor.midY)
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(centre) }) else { return nil }
+        let visible = screen.visibleFrame
+
+        // Above the field; below it only when there's no room (a field at the top of the screen).
+        var y = anchor.maxY + Self.gap
+        if y + Self.size.height > visible.maxY { y = anchor.minY - Self.gap - Self.size.height }
+
+        let x = min(max(anchor.minX, visible.minX + Self.gap), visible.maxX - Self.size.width - Self.gap)
+        return NSPoint(x: x, y: min(max(y, visible.minY), visible.maxY - Self.size.height))
+    }
+
+    /// AX frames are top-left-origin, y-down, in one global space anchored at the primary
+    /// display's top-left; AppKit's are bottom-left-origin, y-up, anchored at its bottom-left.
+    /// Flipping against the primary display's height is exact for every display in the layout.
+    private static func appKitRect(fromAX rect: CGRect) -> NSRect? {
+        guard let primary = NSScreen.screens.first else { return nil }
+        return NSRect(x: rect.minX, y: primary.frame.height - rect.maxY, width: rect.width, height: rect.height)
+    }
+
+    private func appKitRect(of element: AXUIElement) -> NSRect? {
+        guard let position = axValue(element, kAXPositionAttribute, .cgPoint, CGPoint.self),
+              let size = axValue(element, kAXSizeAttribute, .cgSize, CGSize.self)
+        else { return nil }
+        return Self.appKitRect(fromAX: CGRect(origin: position, size: size))
+    }
+
+    /// The caret's line, for apps that can report it. Many can't, hence the optional.
+    private func caretRect(of element: AXUIElement) -> NSRect? {
+        var range: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &range) == .success,
+              let range
         else { return nil }
 
-        // AX position is top-left-origin, y-down, in the primary display's coordinate space;
-        // AppKit screen coordinates are bottom-left-origin, y-up. This conversion is only
-        // exact on the primary display — an acceptable approximation for "roughly under the
-        // field," not pixel-perfect placement on a secondary monitor.
-        let primaryHeight = screen.frame.height
-        let flippedY = primaryHeight - axPosition.y - axSize.height
+        var bounds: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(
+            element, kAXBoundsForRangeParameterizedAttribute as CFString, range, &bounds
+        ) == .success, let bounds else { return nil }
 
-        let point = NSPoint(x: axPosition.x, y: flippedY - Self.size.height - 8)
-        let candidate = NSRect(origin: point, size: Self.size)
-        guard screen.frame.intersects(candidate) else { return nil }
-        return point
+        let value = unsafeDowncast(bounds as AnyObject, to: AXValue.self)
+        var rect = CGRect.zero
+        guard AXValueGetType(value) == .cgRect, AXValueGetValue(value, .cgRect, &rect),
+              rect.height > 0, rect.origin != .zero
+        else { return nil }
+        return Self.appKitRect(fromAX: rect)
     }
 
     private func axValue<T>(_ element: AXUIElement, _ attribute: String, _ type: AXValueType, _: T.Type) -> T? {
@@ -110,10 +148,13 @@ final class CorrectionToastPanel: NSPanel {
         return value.pointee
     }
 
-    /// Same spot `HUDPanel.reposition()` uses — reused so an unpositioned toast is still
-    /// consistent with the rest of the app's floating UI.
-    private func aboveDockOrigin() -> NSPoint {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return .zero }
+    /// Same spot `HUDPanel.reposition()` uses, but on the display under the mouse: with
+    /// several screens `NSScreen.main` can be a different one from where the user is typing.
+    private func fallbackOrigin() -> NSPoint {
+        let mouse = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) })
+            ?? NSScreen.main ?? NSScreen.screens.first
+        else { return .zero }
         let visible = screen.visibleFrame
         return NSPoint(x: visible.midX - Self.size.width / 2, y: visible.minY + 96)
     }

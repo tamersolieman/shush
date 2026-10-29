@@ -78,11 +78,9 @@ final class SnippetStore {
 
     // MARK: - Sync
 
-    /// `.distantPast` when nothing has ever been saved, so a fresh machine never wins a
-    /// last-write-wins comparison against Drive.
-    var lastModified: Date {
-        (try? FileManager.default.attributesOfItem(atPath: Self.fileURL.path)[.modificationDate] as? Date) ?? .distantPast
-    }
+    /// Whether anything has ever been saved here, so a fresh Mac doesn't count as having data
+    /// to contribute to its first sync.
+    var hasFile: Bool { FileManager.default.fileExists(atPath: Self.fileURL.path) }
 
     func applyRemote(_ remote: [Snippet]) {
         snippets = remote

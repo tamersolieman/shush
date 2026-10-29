@@ -58,6 +58,14 @@ struct SnippetsPayload: Codable {
     var snippets: [Snippet]
 }
 
+/// One Mac's transcript history. Per-device like stats, so two Macs dictating at once never
+/// overwrite each other; each Mac only ever writes its own file.
+struct DeviceRunsPayload: Codable {
+    var deviceID: String
+    var updatedAt: Date
+    var runs: [DictationRun]
+}
+
 struct DeviceStatsPayload: Codable {
     var deviceID: String
     var updatedAt: Date

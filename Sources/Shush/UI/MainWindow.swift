@@ -262,9 +262,9 @@ private struct TopBar: View {
             Spacer()
 
             switch section {
-            case .dashboard, .transcripts:
+            case .transcripts:
                 RecordControl(controller: controller)
-            case .dictionary, .snippets, .settings:
+            case .dashboard, .dictionary, .snippets, .settings:
                 EmptyView()
             }
         }
@@ -273,8 +273,8 @@ private struct TopBar: View {
     }
 }
 
-/// Record button + elapsed timer, shown on Dashboard and Transcripts — the two pages where
-/// seeing your history makes "start another one" natural.
+/// Record button + elapsed timer, shown on Transcripts, where seeing your history makes
+/// "start another one" natural.
 private struct RecordControl: View {
     @Bindable var controller: DictationController
 

@@ -65,6 +65,16 @@ final class LifetimeStatsStore {
         merged = Self.merge(local: current, selfDeviceID: DeviceID.value, remoteDevices: remoteDevices)
     }
 
+    /// Restores this Mac's own totals from its Drive copy when local data was lost. Counters
+    /// only ever grow, so a bigger copy of this device's own file is always the truth.
+    func adoptIfBehind(_ remote: LifetimeStats) {
+        guard remote.totalRuns > current.totalRuns else { return }
+        current = remote
+        merged = Self.merge(local: remote, selfDeviceID: DeviceID.value, remoteDevices: lastRemoteDevices)
+        guard let data = try? JSONEncoder().encode(remote) else { return }
+        defaults.set(data, forKey: defaultsKey)
+    }
+
     /// Folds one completed run into the lifetime totals. Call once per run, at the point
     /// it's recorded — never on delete, trim, or clear.
     func record(_ run: DictationRun) {

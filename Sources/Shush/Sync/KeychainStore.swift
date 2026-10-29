@@ -17,12 +17,21 @@ enum KeychainStore {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ]
-        SecItemDelete(query as CFDictionary)
+
+        // Update in place when the item exists. Delete-then-add loses the token outright if
+        // the delete is refused (an item written by a differently signed build) and the add
+        // then collides with what's still there.
+        let updated = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if updated == errSecSuccess { return }
+        if updated != errSecItemNotFound { SecItemDelete(query as CFDictionary) }
 
         var attributes = query
         attributes[kSecValueData as String] = data
         attributes[kSecAttrAccessible as String] = accessibility
-        SecItemAdd(attributes as CFDictionary, nil)
+        let added = SecItemAdd(attributes as CFDictionary, nil)
+        if added != errSecSuccess {
+            Log.sync.error("Keychain save failed for \(account, privacy: .public) (OSStatus \(added, privacy: .public))")
+        }
     }
 
     static func load(service: String, account: String) -> Data? {
@@ -35,6 +44,9 @@ enum KeychainStore {
         ]
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status != errSecSuccess && status != errSecItemNotFound {
+            Log.sync.error("Keychain read failed for \(account, privacy: .public) (OSStatus \(status, privacy: .public))")
+        }
         guard status == errSecSuccess else { return nil }
         return result as? Data
     }

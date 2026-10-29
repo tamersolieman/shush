@@ -44,7 +44,7 @@ Voice activity detection trims silence automatically, and filler words like "um"
 
 ### Sync across your Macs
 
-Sign in with Google and Shush keeps your settings, your personal dictionary, your snippets, and your lifetime stats in step across every Mac you use it on, stored privately in your own Google Drive — nothing shared, nothing third-party. Settings and dictionary changes carry over cleanly between machines, and your usage stats add up rather than overwrite, so switching computers never costs you your history.
+Sign in with Google and Shush keeps your settings, your personal dictionary, your snippets, your transcript history, and your lifetime stats in step across every Mac you use it on, stored privately in your own Google Drive — nothing shared, nothing third-party. Dictionary and snippet edits made on two Macs while apart are merged rather than one overwriting the other, transcripts from every Mac show up together, and your usage stats add up rather than overwrite, so switching computers never costs you your history. An edit that couldn't be sent (offline, signed out, app quit) is retried automatically, and sync catches up on wake, on reconnect, and every few minutes. If Google ends the sign-in, Account says so and offers Reconnect instead of silently stopping.
 
 ### Built to stay out of your way
 

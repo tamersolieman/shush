@@ -72,17 +72,106 @@ struct DictationRun: Codable, Sendable, Identifiable {
 }
 
 /// Live-updating store behind the dashboard and transcript history views.
+///
+/// `runs` is what the views show: this Mac's history plus the other Macs' (read from Drive by
+/// `SyncEngine`), oldest first. Only `localRuns` is ever written to disk or published; other
+/// Macs' runs are a read-only view, so each Mac stays the sole owner of its own history.
 @MainActor
 @Observable
 final class RunStore {
     static let shared = RunStore()
 
     private(set) var runs: [DictationRun] = []
+    private(set) var localRuns: [DictationRun] = []
+    private var remoteRuns: [DictationRun] = []
 
-    private init() { reload() }
+    private static let hiddenKey = "hiddenRemoteRunIDs"
+    private static var remoteCacheURL: URL { RunLog.directory.appendingPathComponent("remote-runs.json") }
 
+    private init() {
+        remoteRuns = Self.loadRemoteCache()
+        localRuns = RunLog.load()
+        rebuild()
+    }
+
+    /// Every change to this Mac's history ends here, which makes it the one place that tells
+    /// sync the published copy is stale.
     func reload() {
-        runs = RunLog.load()
+        localRuns = RunLog.load()
+        rebuild()
+        SyncEngine.shared.scheduleRunsPush()
+    }
+
+    /// The other Macs' runs, as last read from Drive. Cached on disk so they're there at
+    /// launch before the first sync finishes.
+    func setRemote(_ runs: [DictationRun]) {
+        remoteRuns = runs
+        Self.saveRemoteCache(runs)
+        // A hidden id only matters while some Mac still publishes that run.
+        let present = Set(runs.map(\.id))
+        setHidden(hiddenIDs.filter { present.contains($0) })
+        rebuild()
+    }
+
+    /// Deleting a run that another Mac recorded can only hide it here: that Mac owns the run,
+    /// and removing it there is that Mac's decision.
+    func hide(_ ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        setHidden(hiddenIDs.union(ids))
+        rebuild()
+    }
+
+    func hideAllRemote() {
+        hide(Set(remoteRuns.map(\.id)))
+    }
+
+    private var hiddenIDs: Set<UUID> {
+        Set((UserDefaults.standard.stringArray(forKey: Self.hiddenKey) ?? []).compactMap(UUID.init))
+    }
+
+    private func setHidden(_ ids: Set<UUID>) {
+        UserDefaults.standard.set(ids.map(\.uuidString), forKey: Self.hiddenKey)
+    }
+
+    private func rebuild() {
+        runs = Self.merge(
+            local: localRuns,
+            remote: remoteRuns,
+            hidden: hiddenIDs,
+            limit: Settings.shared.historyLimit,
+            maxAge: Settings.shared.autoDeleteInterval.maxAge
+        )
+    }
+
+    /// Oldest first. The same run can appear on both sides (a Mac reading back its own
+    /// published copy), so it's de-duplicated by id, local copy first.
+    nonisolated static func merge(
+        local: [DictationRun],
+        remote: [DictationRun],
+        hidden: Set<UUID>,
+        limit: Int,
+        maxAge: TimeInterval?,
+        now: Date = .now
+    ) -> [DictationRun] {
+        var seen = Set<UUID>()
+        var merged = (local + remote).filter { !hidden.contains($0.id) && seen.insert($0.id).inserted }
+        if let maxAge {
+            let cutoff = now.addingTimeInterval(-maxAge)
+            merged = merged.filter { $0.date >= cutoff }
+        }
+        merged.sort { $0.date < $1.date }
+        if limit > 0, merged.count > limit { merged = Array(merged.suffix(limit)) }
+        return merged
+    }
+
+    private static func loadRemoteCache() -> [DictationRun] {
+        guard let data = try? Data(contentsOf: remoteCacheURL) else { return [] }
+        return (try? JSONDecoder.sync.decode([DictationRun].self, from: data)) ?? []
+    }
+
+    private static func saveRemoteCache(_ runs: [DictationRun]) {
+        guard let data = try? JSONEncoder.sync.encode(runs) else { return }
+        try? data.write(to: remoteCacheURL, options: .atomic)
     }
 }
 
@@ -158,11 +247,15 @@ enum RunLog {
     }
 
     static func delete(ids: Set<UUID>) {
-        rewrite(load().filter { !ids.contains($0.id) })
+        let local = load()
+        rewrite(local.filter { !ids.contains($0.id) })
+        // Anything not in this Mac's own file came from another Mac, and can only be hidden.
+        RunStore.shared.hide(ids.subtracting(local.map(\.id)))
     }
 
     static func clear() {
         try? FileManager.default.removeItem(at: runsURL)
+        RunStore.shared.hideAllRemote()
         regenerate()
         RunStore.shared.reload()
     }

@@ -38,13 +38,29 @@ final class GoogleAuthService {
 
     private var tokens: Tokens?
 
+    /// Coalesces concurrent refreshes (a sync cycle plus a "Sync Now") into one request.
+    private var refreshTask: Task<Tokens, Error>?
+
     var isSignedIn: Bool { tokens != nil }
 
+    /// An account is remembered (its email is kept) but its tokens are gone — Google ended the
+    /// session, or the Keychain can't be read. The Account page offers Reconnect for this.
+    var needsReconnect: Bool { tokens == nil && Settings.shared.googleAccountEmail != nil }
+
     private init() {
-        if let data = KeychainStore.load(service: Self.keychainService, account: Self.keychainAccount),
-           let decoded = try? JSONDecoder().decode(Tokens.self, from: data) {
-            tokens = decoded
-        }
+        tokens = Self.loadTokens()
+    }
+
+    private static func loadTokens() -> Tokens? {
+        guard let data = KeychainStore.load(service: keychainService, account: keychainAccount) else { return nil }
+        return try? JSONDecoder().decode(Tokens.self, from: data)
+    }
+
+    /// The Keychain can be briefly unreadable at launch; `init` loading once and never again
+    /// would leave a signed-in account looking disconnected for the whole run.
+    func restoreIfNeeded() {
+        guard tokens == nil, Settings.shared.googleAccountEmail != nil else { return }
+        tokens = Self.loadTokens()
     }
 
     // MARK: - Sign in / out
@@ -81,6 +97,11 @@ final class GoogleAuthService {
 
         try await exchangeCode(code, verifier: verifier, redirectURI: redirectURI)
         try await refreshEmail()
+
+        // Connecting is asking for sync, so don't leave it behind a second switch.
+        Settings.shared.syncEnabled = true
+        Settings.shared.lastSyncError = nil
+        Task { await SyncEngine.shared.syncNow() }
     }
 
     /// Best-effort revoke, then clears everything local regardless of whether the network call
@@ -97,21 +118,48 @@ final class GoogleAuthService {
     }
 
     private func clearLocalState() {
+        expireSession()
+        Settings.shared.googleAccountEmail = nil
+    }
+
+    /// The tokens are dead but the account isn't forgotten: the email stays so the Account page
+    /// can say "sign-in expired" and offer Reconnect, instead of silently looking like a
+    /// fresh install.
+    private func expireSession() {
         tokens = nil
         KeychainStore.delete(service: Self.keychainService, account: Self.keychainAccount)
-        Settings.shared.googleAccountEmail = nil
     }
 
     // MARK: - Access token
 
-    /// Refreshes proactively when close to expiry, so callers never see a 401 from an expired
-    /// token — `DriveClient` can assume this always returns a usable token or throws.
+    /// Refreshes proactively when close to expiry, so callers rarely see a 401 from an expired
+    /// token — `DriveClient` can assume this returns a usable token or throws.
     func validAccessToken() async throws -> String {
-        guard var current = tokens else { throw SyncError.notSignedIn }
-        if current.expiresAt <= Date().addingTimeInterval(60) {
-            current = try await refresh(current)
-        }
-        return current.accessToken
+        guard let current = tokens else { throw SyncError.notSignedIn }
+        if current.expiresAt > Date().addingTimeInterval(60) { return current.accessToken }
+        return try await refreshTokens().accessToken
+    }
+
+    /// For when Drive answers 401 to a token that looked valid (clock skew, early revocation).
+    func refreshAccessToken() async throws -> String {
+        try await refreshTokens().accessToken
+    }
+
+    private func refreshTokens() async throws -> Tokens {
+        if let refreshTask { return try await refreshTask.value }
+        guard let current = tokens else { throw SyncError.notSignedIn }
+        let task = Task { try await refresh(current) }
+        refreshTask = task
+        defer { refreshTask = nil }
+        return try await task.value
+    }
+
+    /// Google reports a dead refresh token as `invalid_grant`. Nothing else says anything
+    /// about the token, so nothing else should sign the user out.
+    nonisolated static func isRevokedGrant(status: Int, body: Data) -> Bool {
+        guard status == 400 || status == 401 else { return false }
+        struct Body: Decodable { let error: String? }
+        return (try? JSONDecoder().decode(Body.self, from: body))?.error == "invalid_grant"
     }
 
     private func refresh(_ current: Tokens) async throws -> Tokens {
@@ -126,11 +174,15 @@ final class GoogleAuthService {
         ])
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            // The refresh token itself is dead (revoked externally, expired) — don't keep
-            // retrying against it every sync cycle. Sign out and let the user reconnect.
-            clearLocalState()
-            throw SyncError.tokenExpired
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200 else {
+            // A 5xx, a 429 or a captive-portal page says nothing about the token. Signing out
+            // on those is what made sync "disconnect" by itself, so only a revoked grant does.
+            if Self.isRevokedGrant(status: status, body: data) {
+                expireSession()
+                throw SyncError.tokenExpired
+            }
+            throw SyncError.driveAPI(status: status, message: "token refresh failed")
         }
 
         struct RefreshResponse: Decodable {
