@@ -28,11 +28,20 @@ final class CorrectionWatcher {
     private var appElement: AXUIElement?
     private var original: String?
     private var timeoutTask: Task<Void, Never>?
+    private var settleTask: Task<Void, Never>?
+    /// The timeout fired while an edit was still settling; that settle is the last read.
+    private var expired = false
 
     /// Long enough to cover "noticed the mis-transcription a few words later and fixed it,"
     /// short enough not to leave a stale observer attached once the user has clearly moved
     /// on within the same app (e.g. scrolled elsewhere without changing focused element).
     private static let timeout: Duration = .seconds(25)
+
+    /// Quiet time after the last keystroke before the field is read. The first change
+    /// notification arrives after a single letter, when the word is only half-corrected
+    /// ("Shush" → "Shus"); reading then reports a bogus partial rule, or finds nothing to
+    /// report, and either way the watch used to end for good before the real edit landed.
+    private static let settle: Duration = .milliseconds(1500)
 
     private init() {}
 
@@ -82,7 +91,16 @@ final class CorrectionWatcher {
         timeoutTask = Task { [weak self] in
             try? await Task.sleep(for: Self.timeout)
             guard !Task.isCancelled else { return }
-            self?.teardown()
+            self?.expire()
+        }
+    }
+
+    private func expire() {
+        timeoutTask = nil
+        if settleTask == nil {
+            teardown()
+        } else {
+            expired = true
         }
     }
 
@@ -102,28 +120,54 @@ final class CorrectionWatcher {
         guard observer != nil else { return }
 
         if notification == kAXValueChangedNotification as String {
-            evaluateEdit()
+            scheduleSettle()
+            return
         }
-        // Either path — evaluated or abandoned (focus moved, element destroyed) — this
-        // watch is done. Don't keep watching for a second edit; that's how a normal typing
-        // session would spam toasts.
+
+        // Focus moved or the element went away. An edit still settling gets its one last
+        // read — fixing a word and hitting Return or clicking away must not lose it.
+        if settleTask != nil { evaluateEdit() }
         teardown()
     }
 
-    private func evaluateEdit() {
-        guard let original, let watchedElement else { return }
+    /// Restarts the quiet-period clock on every change. After the timeout an already-pending
+    /// read is not pushed out any further, so a field that never stops changing can't keep
+    /// the watch alive.
+    private func scheduleSettle() {
+        if expired, settleTask != nil { return }
+
+        settleTask?.cancel()
+        settleTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.settle)
+            guard !Task.isCancelled else { return }
+            self?.settled()
+        }
+    }
+
+    /// Ends the watch once a correction has been offered — never a second one, that's how a
+    /// normal typing session would spam toasts. With nothing to offer yet (an append, a
+    /// half-finished edit) it keeps watching until the timeout.
+    private func settled() {
+        settleTask = nil
+        if evaluateEdit() || expired { teardown() }
+    }
+
+    @discardableResult
+    private func evaluateEdit() -> Bool {
+        guard let original, let watchedElement else { return false }
 
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(watchedElement, kAXValueAttribute as CFString, &value) == .success,
               let current = value as? String
-        else { return }
+        else { return false }
 
-        guard let correction = CorrectionDiff.detect(original: original, current: current) else { return }
+        guard let correction = CorrectionDiff.detect(original: original, current: current) else { return false }
 
         Log.correction.info(
             "detected correction: \(correction.hear, privacy: .private) -> \(correction.write, privacy: .private)"
         )
         onCorrectionDetected?(correction, watchedElement)
+        return true
     }
 
     func cancel() {
@@ -133,6 +177,9 @@ final class CorrectionWatcher {
     private func teardown() {
         timeoutTask?.cancel()
         timeoutTask = nil
+        settleTask?.cancel()
+        settleTask = nil
+        expired = false
 
         if let observer, let watchedElement {
             AXObserverRemoveNotification(observer, watchedElement, kAXValueChangedNotification as CFString)
