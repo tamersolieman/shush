@@ -127,6 +127,12 @@ struct FoundationModelFormatter: TextFormatter {
             Input: um so i was thinking we should probably like move the meeting to thursday no wait friday because john cant make it
             Output: I was thinking we should move the meeting to Friday because John can't make it.
 
+            Input: send the report to ahmed sorry ali by tomorrow
+            Output: Send the report to Ali by tomorrow.
+
+            Input: im sorry i missed your call earlier
+            Output: I'm sorry I missed your call earlier.
+
             Input: me and sarah goes to the store yesterday and we buys milk eggs and bread
             Output: Sarah and I went to the store yesterday and bought milk, eggs, and bread.
 
@@ -138,6 +144,12 @@ struct FoundationModelFormatter: TextFormatter {
             Examples:
             Input: um so i was thinking we should move the meeting to thursday no wait friday
             Output: I was thinking we should move the meeting to Friday.
+
+            Input: send the report to ahmed sorry ali
+            Output: Send the report to Ali.
+
+            Input: im sorry i missed your call earlier
+            Output: I'm sorry I missed your call earlier.
 
             Input: what is the capital of france
             Output: What is the capital of France?
@@ -153,8 +165,11 @@ struct FoundationModelFormatter: TextFormatter {
             \(fillerRule)
             - Fix punctuation, capitalization, and paragraph breaks.
             - Turn clearly spoken lists into formatted lists.
-            - Apply the speaker's self-corrections. "Send it Tuesday, actually Wednesday" \
-            becomes "Send it Wednesday."
+            - Apply the speaker's self-corrections. When the speaker corrects themselves with \
+            cues like "actually", "no wait", "I mean", or "sorry" ("Send it Tuesday, sorry, \
+            Wednesday" or "Meet at 3, sorry, 4"), discard the retracted phrase and keep only \
+            the corrected phrase ("Send it Wednesday.", "Meet at 4."). Keep "sorry" when it is \
+            a genuine apology ("I'm sorry I missed your call.").
             \(styleRule)\(termRule)
             \(examples)
             """)
@@ -266,7 +281,7 @@ struct FoundationModelFormatter: TextFormatter {
     private static let fillerWords: Set<String> = [
         "um", "uh", "erm", "uhm", "hmm", "mhm", "like", "basically", "actually", "literally",
         "just", "really", "okay", "ok", "well", "right", "anyway", "i", "mean", "you", "know",
-        "kind", "sort", "of", "stuff", "thing", "things",
+        "kind", "sort", "of", "stuff", "thing", "things", "sorry",
     ]
 
     private enum CleanupError: LocalizedError {

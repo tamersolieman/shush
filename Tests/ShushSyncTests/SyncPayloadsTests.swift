@@ -21,8 +21,7 @@ struct SyncPayloadCodecTests {
             muteWhileRecording: false,
             appearance: "system",
             historyLimit: 10,
-            autoDeleteInterval: "threeDays",
-            showWhatsNew: true
+            autoDeleteInterval: "threeDays"
         )
         let payload = SettingsPayload(updatedAt: .now, deviceID: "device-1", settings: snapshot)
 

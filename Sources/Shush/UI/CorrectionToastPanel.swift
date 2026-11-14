@@ -11,7 +11,7 @@ final class CorrectionToastPanel: NSPanel {
     private var dismissTask: Task<Void, Never>?
 
     private static let size = NSSize(width: 360, height: 118)
-    private static let autoDismiss: Duration = .seconds(8)
+    private static let autoDismiss: Duration = .seconds(15)
     private static let gap: CGFloat = 8
     /// Above this height a field is a pane (an editor, a long compose box), and "above the
     /// field" would be nowhere near where the text landed — anchor on the caret line instead.
@@ -45,6 +45,9 @@ final class CorrectionToastPanel: NSPanel {
             onDismiss: { [weak self] in
                 onDismiss()
                 self?.dismiss()
+            },
+            onHoverChange: { [weak self] hovering in
+                self?.setHovering(hovering)
             }
         ))
     }
@@ -66,6 +69,19 @@ final class CorrectionToastPanel: NSPanel {
             animator().alphaValue = 1
         }
 
+        scheduleAutoDismiss()
+    }
+
+    private func setHovering(_ hovering: Bool) {
+        if hovering {
+            dismissTask?.cancel()
+            dismissTask = nil
+        } else {
+            scheduleAutoDismiss()
+        }
+    }
+
+    private func scheduleAutoDismiss() {
         dismissTask?.cancel()
         dismissTask = Task { [weak self] in
             try? await Task.sleep(for: Self.autoDismiss)

@@ -7,6 +7,7 @@ struct CorrectionToastView: View {
     let correction: CorrectionDiff.Correction
     let onSave: () -> Void
     let onDismiss: () -> Void
+    var onHoverChange: (Bool) -> Void = { _ in }
 
     private var warnings: [DictionaryWarning] {
         DictionaryWarning.check(.correction(hear: correction.hear, write: correction.write))
@@ -68,5 +69,6 @@ struct CorrectionToastView: View {
             RoundedRectangle(cornerRadius: DS.Radius.card)
                 .strokeBorder(DS.Color.border, lineWidth: DS.Border.hairline)
         )
+        .onHover(perform: onHoverChange)
     }
 }

@@ -37,7 +37,6 @@ struct SettingsSnapshot: Codable {
     var appearance: String
     var historyLimit: Int
     var autoDeleteInterval: String
-    var showWhatsNew: Bool
 }
 
 struct SettingsPayload: Codable {

@@ -27,6 +27,11 @@ final class CorrectionWatcher {
     private var watchedElement: AXUIElement?
     private var appElement: AXUIElement?
     private var original: String?
+    /// Set when `observe` runs before an async ⌘V paste has landed in `watchedElement`, so
+    /// the paste's own `kAXValueChangedNotification` captures the full-field baseline instead
+    /// of being treated as a user edit.
+    private var pendingInjected: String?
+    private var observedAt: ContinuousClock.Instant?
     private var timeoutTask: Task<Void, Never>?
     private var settleTask: Task<Void, Never>?
     /// The timeout fired while an edit was still settling; that settle is the last read.
@@ -86,7 +91,17 @@ final class CorrectionWatcher {
         observer = newObserver
         watchedElement = element
         appElement = app
-        original = injected
+        observedAt = .now
+
+        // Capture the whole field as the baseline so edits to a dictation appended onto
+        // existing text don't diff against the injected snippet alone.
+        if let current = readValue(of: element), current.contains(injected) {
+            original = current
+            pendingInjected = nil
+        } else {
+            original = nil
+            pendingInjected = injected
+        }
 
         timeoutTask = Task { [weak self] in
             try? await Task.sleep(for: Self.timeout)
@@ -120,6 +135,21 @@ final class CorrectionWatcher {
         guard observer != nil else { return }
 
         if notification == kAXValueChangedNotification as String {
+            if let pending = pendingInjected, let watchedElement {
+                if let current = readValue(of: watchedElement), current.contains(pending) {
+                    original = current
+                    pendingInjected = nil
+                    return
+                }
+                // If the paste never matched verbatim (e.g. target app normalized whitespace)
+                // after the paste window, fall back to the injected string so edits still work.
+                if let observedAt, ContinuousClock.now - observedAt > .milliseconds(500) {
+                    original = pending
+                    pendingInjected = nil
+                } else {
+                    return
+                }
+            }
             scheduleSettle()
             return
         }
@@ -154,12 +184,9 @@ final class CorrectionWatcher {
 
     @discardableResult
     private func evaluateEdit() -> Bool {
-        guard let original, let watchedElement else { return false }
-
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(watchedElement, kAXValueAttribute as CFString, &value) == .success,
-              let current = value as? String
-        else { return false }
+        guard let original, let watchedElement, let current = readValue(of: watchedElement) else {
+            return false
+        }
 
         guard let correction = CorrectionDiff.detect(original: original, current: current) else { return false }
 
@@ -196,5 +223,15 @@ final class CorrectionWatcher {
         watchedElement = nil
         appElement = nil
         original = nil
+        pendingInjected = nil
+        observedAt = nil
+    }
+
+    private func readValue(of element: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value) == .success else {
+            return nil
+        }
+        return value as? String
     }
 }

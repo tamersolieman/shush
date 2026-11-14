@@ -190,12 +190,6 @@ final class Settings {
         didSet { defaults.set(autoDeleteInterval.rawValue, forKey: Keys.autoDeleteInterval); markDirtyForSync() }
     }
 
-    /// Show release notes after an update. No changelog UI exists yet — this just holds the
-    /// preference for when one does.
-    var showWhatsNew: Bool {
-        didSet { defaults.set(showWhatsNew, forKey: Keys.showWhatsNew); markDirtyForSync() }
-    }
-
     /// The signed-in Google account's email, or nil when not connected. Display-only — the
     /// tokens that actually authorize sync live in the Keychain (`GoogleAuthService`), not here.
     var googleAccountEmail: String? {
@@ -265,7 +259,6 @@ final class Settings {
         static let appearance = "appearance"
         static let historyLimit = "historyLimit"
         static let autoDeleteInterval = "autoDeleteInterval"
-        static let showWhatsNew = "showWhatsNew"
         static let googleAccountEmail = "googleAccountEmail"
         static let syncEnabled = "syncEnabled"
         static let lastSyncDate = "lastSyncDate"
@@ -300,7 +293,6 @@ final class Settings {
         autoDeleteInterval = AutoDeleteInterval(
             rawValue: defaults.string(forKey: Keys.autoDeleteInterval) ?? ""
         ) ?? .threeDays
-        showWhatsNew = defaults.object(forKey: Keys.showWhatsNew) as? Bool ?? true
         googleAccountEmail = defaults.string(forKey: Keys.googleAccountEmail)
         syncEnabled = defaults.object(forKey: Keys.syncEnabled) as? Bool ?? false
         lastSyncDate = defaults.object(forKey: Keys.lastSyncDate) as? Date
@@ -335,8 +327,7 @@ final class Settings {
             muteWhileRecording: muteWhileRecording,
             appearance: appearance.rawValue,
             historyLimit: historyLimit,
-            autoDeleteInterval: autoDeleteInterval.rawValue,
-            showWhatsNew: showWhatsNew
+            autoDeleteInterval: autoDeleteInterval.rawValue
         )
     }
 
@@ -360,7 +351,6 @@ final class Settings {
         appearance = AppearanceMode(rawValue: snapshot.appearance) ?? appearance
         historyLimit = snapshot.historyLimit
         autoDeleteInterval = AutoDeleteInterval(rawValue: snapshot.autoDeleteInterval) ?? autoDeleteInterval
-        showWhatsNew = snapshot.showWhatsNew
         settingsLastModified = updatedAt
     }
 }

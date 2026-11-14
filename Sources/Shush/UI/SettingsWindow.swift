@@ -792,6 +792,7 @@ private struct AccountSection: View {
 
 private struct AboutSection: View {
     @Bindable var settings: Settings
+    @State private var showChangelog = false
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -809,15 +810,26 @@ private struct AboutSection: View {
         CardDivider()
 
         SettingsRow(title: "Version") {
-            Text("v\(appVersion)")
-                .font(DS.Font.value)
-                .foregroundStyle(DS.Color.textTertiary)
+            Button {
+                showChangelog = true
+            } label: {
+                HStack(spacing: DS.Space.tight) {
+                    Text("v\(appVersion)")
+                        .font(DS.Font.button)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundStyle(DS.Color.primary)
+                .padding(.horizontal, DS.Space.base)
+                .frame(height: 28)
+                .background(DS.Color.primaryLight, in: .rect(cornerRadius: DS.Radius.pill))
+            }
+            .buttonStyle(.plain)
+            .sheet(isPresented: $showChangelog) {
+                ChangelogSheet(currentVersion: appVersion)
+            }
         }
-        RowSubtitle("Current version of Shush")
-        CardDivider()
-
-        ToggleRow(title: "Show What's New", isOn: $settings.showWhatsNew)
-        RowSubtitle("Show release notes after Shush updates")
+        RowSubtitle("Current version of Shush — click to view changelog")
         CardDivider()
 
         SettingsRow(title: "Website") {
@@ -855,6 +867,115 @@ private struct AboutSection: View {
         ) {
             NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Console.app"))
         }
+    }
+}
+
+private struct ReleaseNote: Identifiable {
+    let version: String
+    let changes: [String]
+    var id: String { version }
+
+    static let all: [ReleaseNote] = [
+        ReleaseNote(
+            version: "0.11.2",
+            changes: [
+                "Self-correction with \"sorry\": saying \"sorry\" mid-dictation (e.g. \"meet at 3, sorry, 4\") discards the retracted phrase and keeps the correction, while preserving genuine apologies.",
+                "More reliable \"Save correction?\" toast: detects 1–2 character edits in fields that already contain text, stays visible for 15 seconds, and pauses auto-dismiss while hovered.",
+                "Added this changelog view when clicking the version badge in Settings → About.",
+            ]
+        ),
+        ReleaseNote(
+            version: "0.11.1",
+            changes: [
+                "Waits for a brief typing pause before reading a hand-correction so partial edits aren't misread.",
+            ]
+        ),
+        ReleaseNote(
+            version: "0.11.0",
+            changes: [
+                "Self-healing Google Drive sync and cross-Mac transcript syncing.",
+            ]
+        ),
+        ReleaseNote(
+            version: "0.10.0",
+            changes: [
+                "Added Snippets: spoken cues expand to saved text verbatim.",
+            ]
+        ),
+    ]
+}
+
+private struct ChangelogSheet: View {
+    let currentVersion: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.roomy) {
+            HStack {
+                VStack(alignment: .leading, spacing: DS.Space.hair) {
+                    Text("Changelog")
+                        .font(DS.Font.pageTitle)
+                        .foregroundStyle(DS.Color.textPrimary)
+                    Text("Shush v\(currentVersion)")
+                        .font(DS.Font.meta)
+                        .foregroundStyle(DS.Color.textTertiary)
+                }
+                Spacer()
+                Button("Done") { dismiss() }
+                    .buttonStyle(.plain)
+                    .font(DS.Font.button)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, DS.Space.roomy)
+                    .frame(height: 30)
+                    .background(DS.Color.primary, in: .rect(cornerRadius: DS.Radius.control))
+            }
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: DS.Space.base) {
+                    ForEach(ReleaseNote.all) { note in
+                        VStack(alignment: .leading, spacing: DS.Space.snug) {
+                            HStack(spacing: DS.Space.snug) {
+                                Text("v\(note.version)")
+                                    .font(DS.Font.label)
+                                    .foregroundStyle(DS.Color.textPrimary)
+                                if note.version == currentVersion {
+                                    Text("Current")
+                                        .font(DS.Font.meta)
+                                        .foregroundStyle(DS.Color.primary)
+                                        .padding(.horizontal, DS.Space.snug)
+                                        .padding(.vertical, DS.Space.hair)
+                                        .background(DS.Color.primaryLight, in: .rect(cornerRadius: DS.Radius.pill))
+                                }
+                            }
+
+                            VStack(alignment: .leading, spacing: DS.Space.tight) {
+                                ForEach(note.changes, id: \.self) { change in
+                                    HStack(alignment: .top, spacing: DS.Space.snug) {
+                                        Text("•")
+                                            .font(DS.Font.body)
+                                            .foregroundStyle(DS.Color.textTertiary)
+                                        Text(change)
+                                            .font(DS.Font.body)
+                                            .foregroundStyle(DS.Color.textSecondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(DS.Space.roomy)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(DS.Color.surface, in: .rect(cornerRadius: DS.Radius.card))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DS.Radius.card)
+                                .strokeBorder(DS.Color.border, lineWidth: DS.Border.hairline)
+                        )
+                    }
+                }
+            }
+        }
+        .padding(DS.Space.section)
+        .frame(width: 480, height: 420)
+        .background(DS.Color.background)
     }
 }
 
