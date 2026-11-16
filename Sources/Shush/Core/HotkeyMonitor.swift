@@ -85,12 +85,19 @@ final class HotkeyMonitor {
                 // CGEvent isn't Sendable, so pull out the plain values before crossing into
                 // actor-isolated code. The tap was added to the main run loop, so this
                 // callback genuinely does run on the main thread.
+                //
+                // Avoid `MainActor.assumeIsolated` here: it calls `swift_task_isMainExecutorImpl`
+                // on every keypress, which has been observed crashing in `libswift_Concurrency`
+                // (`objc_opt_class` on an invalid pointer). Assert main-thread execution via
+                // `dispatchPrecondition` and bridge into `@MainActor` directly.
+                dispatchPrecondition(condition: .onQueue(.main))
                 let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
                 let flags = event.flags
                 let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
-                let consume = MainActor.assumeIsolated {
+                let handleOnMain: @MainActor () -> Bool = {
                     monitor.handle(type: type, keyCode: keyCode, flags: flags, isRepeat: isRepeat)
                 }
+                let consume = unsafeBitCast(handleOnMain, to: (() -> Bool).self)()
                 return consume ? nil : Unmanaged.passUnretained(event)
             },
             userInfo: refcon
