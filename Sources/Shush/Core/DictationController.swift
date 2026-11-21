@@ -341,7 +341,6 @@ final class DictationController {
             // about to receive the text — the one the dashboard should credit.
             let target = NSWorkspace.shared.frontmostApplication
             recordRun(text: output, corrections: corrections, appName: target?.localizedName, appBundleID: target?.bundleIdentifier)
-            self.transcript = output
             TextInjector.insert(output)
             if snippet == nil && Settings.shared.learnFromCorrectionsEnabled && Permissions.hasAccessibility {
                 CorrectionWatcher.shared.observe(injected: output, target: target)

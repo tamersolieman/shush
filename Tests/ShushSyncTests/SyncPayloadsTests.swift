@@ -33,6 +33,52 @@ struct SyncPayloadCodecTests {
         #expect(decoded.settings.historyLimit == 10)
     }
 
+    @Test("SettingsSnapshot encodes showWhatsNew for <=0.11.1 compatibility and decodes payloads omitting it")
+    func settingsShowWhatsNewBackwardsCompatibility() throws {
+        let snapshot = SettingsSnapshot(
+            pushToTalkKeyData: nil,
+            pushToTalkEnabled: true,
+            engine: "apple",
+            cleanupEnabled: true,
+            smartCleanup: true,
+            soundEnabled: true,
+            vadEnabled: true,
+            removeFillerWords: true,
+            learnFromCorrectionsEnabled: true,
+            speechLanguage: "auto",
+            translateToEnglish: false,
+            muteWhileRecording: false,
+            appearance: "system",
+            historyLimit: 10,
+            autoDeleteInterval: "threeDays"
+        )
+        let encoded = try JSONEncoder.sync.encode(snapshot)
+        let jsonObject = try JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        #expect(jsonObject?["showWhatsNew"] as? Bool == false)
+
+        let legacyJSON = """
+        {
+            "pushToTalkEnabled": true,
+            "engine": "apple",
+            "cleanupEnabled": true,
+            "smartCleanup": false,
+            "soundEnabled": true,
+            "vadEnabled": true,
+            "removeFillerWords": true,
+            "learnFromCorrectionsEnabled": false,
+            "speechLanguage": "auto",
+            "translateToEnglish": false,
+            "muteWhileRecording": false,
+            "appearance": "system",
+            "historyLimit": 10,
+            "autoDeleteInterval": "threeDays"
+        }
+        """
+        let decoded = try JSONDecoder.sync.decode(SettingsSnapshot.self, from: Data(legacyJSON.utf8))
+        #expect(decoded.showWhatsNew == nil)
+        #expect(decoded.engine == "apple")
+    }
+
     @Test("DictionaryPayload round trips through JSON")
     func dictionaryRoundTrip() throws {
         let payload = DictionaryPayload(updatedAt: .now, deviceID: "device-1", fileText: "Anthropic\ncloud code -> Claude Code\n")

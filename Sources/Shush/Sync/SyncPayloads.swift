@@ -37,6 +37,8 @@ struct SettingsSnapshot: Codable {
     var appearance: String
     var historyLimit: Int
     var autoDeleteInterval: String
+    /// Kept for backwards compatibility with <= 0.11.1 clients that decode it as a required Bool.
+    var showWhatsNew: Bool? = false
 }
 
 struct SettingsPayload: Codable {

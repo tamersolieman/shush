@@ -19,15 +19,12 @@ struct RuleBasedFormatter: TextFormatter {
     /// match before "uh".
     private static let fillers = ["uh-huh", "um", "uh", "erm", "uhm", "hmm", "mhm"]
 
-    /// Words before "sorry" that indicate a genuine apology rather than a retraction.
-    private static let apologyPreceders: Set<String> = [
-        "i", "im", "am", "was", "were", "feel", "so", "very", "really", "truly",
-        "terribly", "awfully", "deeply",
-    ]
-
-    /// Words after "sorry" that indicate a genuine apology clause rather than a replacement word.
-    private static let apologyFollowers: Set<String> = [
-        "i", "for", "about", "to", "that", "if", "we", "you", "they", "it", "this", "my",
+    /// Short list of common English stutter words collapsed when repeated consecutively.
+    /// Intentionally excludes expressive/grammatical doubles ("bye bye", "had had") and
+    /// non-English words (e.g. Arabic "جدا جدا").
+    private static let stutterWords: Set<String> = [
+        "the", "a", "an", "i", "we", "you", "to", "of", "in", "it", "is", "that",
+        "and", "or", "but", "should", "can", "will",
     ]
 
     /// Spoken punctuation people actually use mid-dictation.
@@ -42,9 +39,10 @@ struct RuleBasedFormatter: TextFormatter {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return text }
 
-        if removeFillerWords { text = stripFillers(from: text) }
-        text = applySorryCorrections(in: text)
-        text = removeConsecutiveDuplicates(in: text)
+        if removeFillerWords {
+            text = stripFillers(from: text)
+            text = removeStutterDuplicates(in: text)
+        }
         text = applySpokenPunctuation(to: text)
         text = collapseWhitespace(in: text)
         text = cleanOrphanCommas(in: text)
@@ -69,32 +67,10 @@ struct RuleBasedFormatter: TextFormatter {
         return result
     }
 
-    /// Replaces simple `"<word>,? sorry,? <word>"` single-word retractions while leaving
-    /// genuine apologies like `"I'm sorry I missed..."` intact.
-    private func applySorryCorrections(in text: String) -> String {
-        let pattern = "(?i)(?<![\\w'])([\\p{L}\\d]+),?[ \\t]+sorry,?[ \\t]+([\\p{L}\\d]+)(?![\\w'])"
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
-
-        let nsText = text as NSString
-        let matches = regex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
-        guard !matches.isEmpty else { return text }
-
-        let result = NSMutableString(string: text)
-        for match in matches.reversed() {
-            let retracted = nsText.substring(with: match.range(at: 1))
-            let replacement = nsText.substring(with: match.range(at: 2))
-            if Self.apologyPreceders.contains(retracted.lowercased())
-                || Self.apologyFollowers.contains(replacement.lowercased()) {
-                continue
-            }
-            result.replaceCharacters(in: match.range, with: replacement)
-        }
-        return result as String
-    }
-
-    private func removeConsecutiveDuplicates(in text: String) -> String {
+    private func removeStutterDuplicates(in text: String) -> String {
+        let joined = Self.stutterWords.joined(separator: "|")
+        let pattern = "(?i)(?<![\\w'])(\(joined))[ \\t]+\\1(?![\\w'])"
         var result = text
-        let pattern = "(?i)(?<![\\w'])([\\p{L}]+)[ \\t]+\\1(?![\\w'])"
         while true {
             let updated = result.replacingOccurrences(
                 of: pattern,

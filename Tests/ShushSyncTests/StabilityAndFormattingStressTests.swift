@@ -33,6 +33,18 @@ struct FormattingStressTests {
                 "we we should should probably go now",
                 "We should probably go now."
             ),
+            (
+                "bye bye",
+                "Bye bye."
+            ),
+            (
+                "i had had enough",
+                "I had had enough."
+            ),
+            (
+                "جدا جدا",
+                "جدا جدا."
+            ),
         ]
     )
     func ruleBasedPauseCommasAndFillers(input: String, expected: String) async {
@@ -42,19 +54,18 @@ struct FormattingStressTests {
     }
 
     @Test(
-        "RuleBasedFormatter handles sorry self-corrections and preserves apologies",
+        "RuleBasedFormatter preserves real sorry phrases and apologies",
         arguments: [
-            ("send it tuesday, sorry, wednesday", "Send it wednesday."),
-            ("meet at 3 sorry 4", "Meet at 4."),
-            ("send to ahmed, sorry ali by tomorrow", "Send to ali by tomorrow."),
-            ("tuesday sorry wednesday", "Wednesday."),
+            ("he said sorry again", "He said sorry again."),
+            ("tell her sorry then", "Tell her sorry then."),
+            ("oh sorry mate i missed that", "Oh sorry mate i missed that."),
             ("i'm sorry i missed your call", "I'm sorry i missed your call."),
             ("sorry for the delay", "Sorry for the delay."),
             ("we are sorry about that", "We are sorry about that."),
             ("sorry to bother you", "Sorry to bother you."),
         ]
     )
-    func ruleBasedSorryCorrections(input: String, expected: String) async {
+    func ruleBasedPreservesSorryPhrases(input: String, expected: String) async {
         let formatter = RuleBasedFormatter(removeFillerWords: true)
         let result = await formatter.format(input)
         #expect(result == expected)
@@ -63,8 +74,8 @@ struct FormattingStressTests {
     @Test("RuleBasedFormatter respects removeFillerWords = false")
     func keepsFillersWhenDisabled() async {
         let formatter = RuleBasedFormatter(removeFillerWords: false)
-        let result = await formatter.format("um, hello, , world")
-        #expect(result == "Um, hello, world.")
+        #expect(await formatter.format("um, hello, , world") == "Um, hello, world.")
+        #expect(await formatter.format("the the test") == "The the test.")
     }
 
     @Test(
@@ -109,6 +120,8 @@ struct FormattingStressTests {
             ("hello world", "Here's the cleaned transcript: Hello world."),
             ("write a poem about cats", "Certainly, here is a poem about cats: whiskers and purrs."),
             ("tell me a joke", "As an AI, I cannot tell a joke right now."),
+            ("is it going to rain tomorrow", "No, it will not rain tomorrow."),
+            ("can you send me the file", "Yes, I can send you the file."),
         ]
     )
     func foundationModelGuardRejectsInvalidOutputs(original: String, cleaned: String) {

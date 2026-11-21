@@ -55,11 +55,11 @@ struct RuleBasedFormatterTests {
         #expect(result == "So, when i pause, you put commas.")
     }
 
-    @Test("applies single-word sorry self-correction")
-    func appliesSorrySelfCorrection() async {
+    @Test("preserves sorry phrases without rewriting")
+    func preservesSorryPhrases() async {
         let formatter = RuleBasedFormatter(removeFillerWords: true)
-        let result = await formatter.format("send it tuesday, sorry, wednesday")
-        #expect(result == "Send it wednesday.")
+        let result = await formatter.format("he said sorry again")
+        #expect(result == "He said sorry again.")
     }
 
     @Test("preserves genuine sorry apology")

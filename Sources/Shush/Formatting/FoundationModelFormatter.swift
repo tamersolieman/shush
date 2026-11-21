@@ -106,7 +106,7 @@ struct FoundationModelFormatter: TextFormatter {
         _ text: String, removeFillerWords: Bool, polish: Bool, terms: [String]
     ) async throws -> String {
         let fillerRule = removeFillerWords
-            ? "- Remove conversational fluff, hesitation words, and false starts (um, uh, like, you know, I mean, basically, sort of, kind of, whatever, repeated words) along with any stray commas left around them."
+            ? "- Remove hesitation fillers (um, uh, erm, uhm), filler discourse markers (\"you know\", \"basically\", \"sort of\", \"kind of\", and \"like\" only when used as a filler — keep \"like\" in real phrases such as \"I like pizza\"), and false starts, along with any stray commas left around them."
             : "- Keep filler words (um, uh, like, you know) as spoken — do not remove them."
         let styleRule = polish
             ? """
@@ -244,7 +244,7 @@ struct FoundationModelFormatter: TextFormatter {
         //    and 0.21, too close to separate. Discounting fillers on both sides pushes the
         //    real cleanups to 0.6–1.0 and leaves the failures below 0.2.
         let ratio = Double(cleanedTokens.count) / Double(max(1, spokenWordCount(original)))
-        guard ratio >= 0.25, ratio <= 1.5 else {
+        guard ratio >= 0.35, ratio <= 1.5 else {
             Log.speech.info("cleanup rejected — length ratio \(ratio, format: .fixed(precision: 2))")
             return false
         }
@@ -275,8 +275,8 @@ struct FoundationModelFormatter: TextFormatter {
         "won", "wouldn", "couldn", "shouldn",
         "to", "of", "in", "on", "at", "for", "with", "by", "from", "as", "into", "onto",
         "about", "over", "after", "before", "than", "if", "when", "while", "because",
-        "not", "no", "yes", "that", "this", "these", "those", "there", "here",
-        "who", "which", "what", "my", "our", "your", "his", "its", "their",
+        "not", "that", "this", "these", "those", "there", "here",
+        "my", "our", "your", "his", "its", "their",
         "also", "very", "more",
         "going", "want", "went", "bought", "got", "gone", "ran", "saw", "took", "made", "came", "said", "gave",
     ]

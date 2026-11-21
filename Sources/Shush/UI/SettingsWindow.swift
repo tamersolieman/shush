@@ -886,6 +886,15 @@ private struct ReleaseNote: Identifiable {
 
     static let all: [ReleaseNote] = [
         ReleaseNote(
+            version: "0.11.3",
+            changes: [
+                "Smart Cleanup (on-device AI) is now enabled by default, removing pause-induced stray commas and conversational fluff while rephrasing broken sentences cleanly.",
+                "Fixed crashes in Accessibility observation/injection and panel dismissal callbacks (`CFGetTypeID` guards and safe main-actor dispatch).",
+                "Tightened cleanup guard and fallback rules to preserve genuine phrases and backwards-compatible settings sync.",
+                "Increased VAD silence tail (1.5s streaming / 0.6s batch) to reduce mid-sentence comma breaks.",
+            ]
+        ),
+        ReleaseNote(
             version: "0.11.2",
             changes: [
                 "Self-correction with \"sorry\": saying \"sorry\" mid-dictation (e.g. \"meet at 3, sorry, 4\") discards the retracted phrase and keeps the correction, while preserving genuine apologies.",
