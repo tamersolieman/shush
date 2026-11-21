@@ -235,6 +235,14 @@ struct FoundationModelFormatter: TextFormatter {
             return false
         }
 
+        // 1b. A dictated question has to come back still reading as one. Vocabulary can't
+        //     catch the model answering in the question's own words — "will it rain tomorrow"
+        //     → "It will rain tomorrow." invents nothing.
+        guard !losesQuestion(original: original, cleaned: cleaned) else {
+            Log.speech.info("cleanup rejected — dictated question no longer reads as one")
+            return false
+        }
+
         // 2. Length sanity, as a backstop for the case where the model obeys an injected
         //    instruction using only words from the input ("write the word banana" → "Banana").
         //
@@ -266,19 +274,60 @@ struct FoundationModelFormatter: TextFormatter {
         return word.count >= 3 && vocabulary.contains { $0.hasPrefix(stem) }
     }
 
+    /// Kept to words a grammar fix inserts. Modals ("can", "may"), the adverbs "here", "there",
+    /// "also", "very", "more", and yes/no/wh-words are left out on purpose: with the pronouns
+    /// above they are enough to assemble an answer ("I can help you.") out of a dictated
+    /// question, so a model that needs them gets the rule-based fallback instead.
     private static let grammarWords: Set<String> = [
         "i", "me", "we", "us", "you", "he", "him", "she", "her", "it", "they", "them",
         "is", "are", "was", "were", "am", "be", "been", "being",
         "have", "has", "had", "do", "does", "did",
-        "will", "would", "can", "could", "should", "shall", "may", "might", "must",
+        "will", "would",
         "don", "doesn", "didn", "isn", "aren", "wasn", "weren", "hasn", "haven", "hadn",
         "won", "wouldn", "couldn", "shouldn",
         "to", "of", "in", "on", "at", "for", "with", "by", "from", "as", "into", "onto",
         "about", "over", "after", "before", "than", "if", "when", "while", "because",
-        "not", "that", "this", "these", "those", "there", "here",
+        "not", "that", "this", "these", "those",
         "my", "our", "your", "his", "its", "their",
-        "also", "very", "more",
         "going", "want", "went", "bought", "got", "gone", "ran", "saw", "took", "made", "came", "said", "gave",
+    ]
+
+    /// True when the dictation was a question and the cleaned text no longer is. Only the
+    /// opening clause is read for unpunctuated speech, so a question buried after other
+    /// sentences is covered only when the engine punctuated it with "?".
+    private static func losesQuestion(original: String, cleaned: String) -> Bool {
+        guard !cleaned.contains("?") else { return false }
+        return original.contains("?") || opensWithQuestion(original)
+    }
+
+    private static func opensWithQuestion(_ text: String) -> Bool {
+        var words = text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        while let first = words.first, questionLeadIns.contains(first) { words.removeFirst() }
+        guard let first = words.first else { return false }
+        if questionWords.contains(first) { return true }
+        // "can you", "is it": an inverting verb straight into a subject. "do the dishes" is an
+        // instruction, not a question, so the subject is required.
+        guard invertingVerbs.contains(first), words.count > 1 else { return false }
+        return questionSubjects.contains(words[1])
+    }
+
+    /// "when" and "while" are absent on purpose: "when i pause, it adds commas" is a statement.
+    private static let questionWords: Set<String> = [
+        "what", "who", "whom", "whose", "where", "why", "how", "which",
+    ]
+
+    private static let invertingVerbs: Set<String> = [
+        "is", "are", "am", "was", "were", "do", "does", "did", "can", "could", "will", "would",
+        "should", "shall", "may", "might", "have", "has", "had",
+    ]
+
+    private static let questionSubjects: Set<String> = [
+        "i", "you", "we", "they", "he", "she", "it", "there",
+    ]
+
+    /// Words a speaker says before the question proper.
+    private static let questionLeadIns: Set<String> = [
+        "um", "uh", "erm", "uhm", "hmm", "so", "okay", "ok", "well", "and", "but", "hey", "now", "then",
     ]
 
     /// Lowercased alphanumeric words, minus the function words that punctuation-fixing

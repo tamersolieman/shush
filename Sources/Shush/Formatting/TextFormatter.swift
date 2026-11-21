@@ -20,10 +20,10 @@ struct RuleBasedFormatter: TextFormatter {
     private static let fillers = ["uh-huh", "um", "uh", "erm", "uhm", "hmm", "mhm"]
 
     /// Short list of common English stutter words collapsed when repeated consecutively.
-    /// Intentionally excludes expressive/grammatical doubles ("bye bye", "had had") and
-    /// non-English words (e.g. Arabic "جدا جدا").
+    /// Intentionally excludes expressive/grammatical doubles ("bye bye", "had had", "that
+    /// that is true") and non-English words (e.g. Arabic "جدا جدا").
     private static let stutterWords: Set<String> = [
-        "the", "a", "an", "i", "we", "you", "to", "of", "in", "it", "is", "that",
+        "the", "a", "an", "i", "we", "you", "to", "of", "in", "it", "is",
         "and", "or", "but", "should", "can", "will",
     ]
 
@@ -57,6 +57,10 @@ struct RuleBasedFormatter: TextFormatter {
         for filler in Self.fillers {
             // Match the filler as a whole word, plus a trailing comma if the ASR added one.
             let escaped = NSRegularExpression.escapedPattern(for: filler)
+            // A filler ending the text takes the comma before it along, so "I think so, um"
+            // doesn't leave "I think so," — that comma is the pause, not part of the sentence.
+            let trailing = "(?i)[ \\t]*,?[ \\t]*(?<![\\w'-])\(escaped)(?![\\w'-])[ \\t,]*$"
+            result = result.replacingOccurrences(of: trailing, with: "", options: .regularExpression)
             let pattern = "(?i)(?<![\\w'-])\(escaped)(?![\\w'-]),?"
             result = result.replacingOccurrences(
                 of: pattern,

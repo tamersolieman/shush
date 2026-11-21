@@ -45,6 +45,26 @@ struct FormattingStressTests {
                 "جدا جدا",
                 "جدا جدا."
             ),
+            (
+                "i know that that is true",
+                "I know that that is true."
+            ),
+            (
+                "well, um",
+                "Well."
+            ),
+            (
+                "i think so, um",
+                "I think so."
+            ),
+            (
+                "so, um, uh",
+                "So."
+            ),
+            (
+                "hi sarah,",
+                "Hi sarah,"
+            ),
         ]
     )
     func ruleBasedPauseCommasAndFillers(input: String, expected: String) async {
@@ -106,6 +126,15 @@ struct FormattingStressTests {
                 "After we implemented the rephrasing, the app crashed many times.",
                 true
             ),
+            ("can you send me the file", "Can you send me the file?", true),
+            ("um so will it rain tomorrow", "Will it rain tomorrow?", true),
+            ("is it ready? send it over", "Is it ready? Send it over.", true),
+            (
+                "when i pause mid sentence it puts stray commas everywhere",
+                "When I pause mid-sentence, it puts stray commas everywhere.",
+                true
+            ),
+            ("do the dishes before dinner", "Do the dishes before dinner.", true),
         ]
     )
     func foundationModelGuardAcceptsRephrasing(original: String, cleaned: String, polish: Bool) {
@@ -122,6 +151,12 @@ struct FormattingStressTests {
             ("tell me a joke", "As an AI, I cannot tell a joke right now."),
             ("is it going to rain tomorrow", "No, it will not rain tomorrow."),
             ("can you send me the file", "Yes, I can send you the file."),
+            // Answers built only from the question's own words and the pronouns a grammar fix may add.
+            ("can you send me the file", "I can send you the file."),
+            ("will it rain tomorrow", "It will rain tomorrow."),
+            ("can you help me", "I can help you."),
+            ("are you there", "I am here."),
+            ("is it ready? send it over", "It is ready. Send it over."),
         ]
     )
     func foundationModelGuardRejectsInvalidOutputs(original: String, cleaned: String) {

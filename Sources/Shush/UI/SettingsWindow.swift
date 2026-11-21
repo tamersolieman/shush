@@ -886,6 +886,14 @@ private struct ReleaseNote: Identifiable {
 
     static let all: [ReleaseNote] = [
         ReleaseNote(
+            version: "0.11.4",
+            changes: [
+                "Smart Cleanup is stricter about replies: a question you dictate has to come back as a question, otherwise the basic cleanup is used instead of typing an answer.",
+                "Basic cleanup no longer leaves a stray comma when a trailing \"um\" or \"uh\" is removed (\"I think so, um\" becomes \"I think so.\").",
+                "Basic cleanup keeps a deliberate \"that that\" instead of collapsing it.",
+            ]
+        ),
+        ReleaseNote(
             version: "0.11.3",
             changes: [
                 "Smart Cleanup (on-device AI) is now enabled by default, removing pause-induced stray commas and conversational fluff while rephrasing broken sentences cleanly.",
