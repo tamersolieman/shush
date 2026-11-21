@@ -97,7 +97,9 @@ final class CorrectionToastPanel: NSPanel {
             context.duration = 0.16
             animator().alphaValue = 0
         } completionHandler: { [weak self] in
-            MainActor.assumeIsolated { self?.orderOut(nil) }
+            Task { @MainActor in
+                self?.orderOut(nil)
+            }
         }
     }
 
@@ -143,9 +145,9 @@ final class CorrectionToastPanel: NSPanel {
         var bounds: CFTypeRef?
         guard AXUIElementCopyParameterizedAttributeValue(
             element, kAXBoundsForRangeParameterizedAttribute as CFString, range, &bounds
-        ) == .success, let bounds else { return nil }
+        ) == .success, let bounds, CFGetTypeID(bounds) == AXValueGetTypeID() else { return nil }
 
-        let value = unsafeDowncast(bounds as AnyObject, to: AXValue.self)
+        let value = bounds as! AXValue
         var rect = CGRect.zero
         guard AXValueGetType(value) == .cgRect, AXValueGetValue(value, .cgRect, &rect),
               rect.height > 0, rect.origin != .zero
@@ -155,8 +157,9 @@ final class CorrectionToastPanel: NSPanel {
 
     private func axValue<T>(_ element: AXUIElement, _ attribute: String, _ type: AXValueType, _: T.Type) -> T? {
         var raw: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &raw) == .success, let raw else { return nil }
-        let axValue = unsafeDowncast(raw as AnyObject, to: AXValue.self)
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &raw) == .success,
+              let raw, CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
+        let axValue = raw as! AXValue
         guard AXValueGetType(axValue) == type else { return nil }
         let value = UnsafeMutablePointer<T>.allocate(capacity: 1)
         defer { value.deallocate() }

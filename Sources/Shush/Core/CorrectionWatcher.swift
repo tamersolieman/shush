@@ -64,8 +64,8 @@ final class CorrectionWatcher {
         var focused: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             systemWide, kAXFocusedUIElementAttribute as CFString, &focused
-        ) == .success, let focused else { return }
-        let element = unsafeDowncast(focused as AnyObject, to: AXUIElement.self)
+        ) == .success, let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else { return }
+        let element = focused as! AXUIElement
 
         let app = AXUIElementCreateApplication(pid)
 
@@ -125,8 +125,8 @@ final class CorrectionWatcher {
         guard let refcon else { return }
         let watcher = Unmanaged<CorrectionWatcher>.fromOpaque(refcon).takeUnretainedValue()
         let name = notification as String
-        Task { @MainActor in
-            watcher.handle(notification: name)
+        Task { @MainActor [weak watcher] in
+            watcher?.handle(notification: name)
         }
     }
 
@@ -216,7 +216,9 @@ final class CorrectionWatcher {
             AXObserverRemoveNotification(observer, appElement, kAXFocusedUIElementChangedNotification as CFString)
         }
         if let observer {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), .defaultMode)
+            let source = AXObserverGetRunLoopSource(observer)
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .defaultMode)
+            CFRunLoopSourceInvalidate(source)
         }
 
         observer = nil

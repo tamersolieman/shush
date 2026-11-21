@@ -35,4 +35,37 @@ struct FoundationModelFormatterTests {
             cleaned: "The capital of France is Paris."
         ))
     }
+
+    @Test("accepts heavy filler and pause-comma cleanup with polish")
+    func acceptsPauseCommaAndFluffRephrasing() {
+        #expect(FoundationModelFormatter.isPlausibleCleanup(
+            original: "also, when i, say silent, something silent, you put, um, commas, which make the whole sentences are not understandable",
+            cleaned: "Also, when I say something silent, you put commas that make the whole sentences not understandable.",
+            polish: true
+        ))
+    }
+}
+
+@Suite("RuleBasedFormatter fallback cleanup")
+struct RuleBasedFormatterTests {
+    @Test("strips fillers and orphan commas")
+    func stripsFillersAndOrphanCommas() async {
+        let formatter = RuleBasedFormatter(removeFillerWords: true)
+        let result = await formatter.format("um, so, uh, when i pause, , you put commas , .")
+        #expect(result == "So, when i pause, you put commas.")
+    }
+
+    @Test("applies single-word sorry self-correction")
+    func appliesSorrySelfCorrection() async {
+        let formatter = RuleBasedFormatter(removeFillerWords: true)
+        let result = await formatter.format("send it tuesday, sorry, wednesday")
+        #expect(result == "Send it wednesday.")
+    }
+
+    @Test("preserves genuine sorry apology")
+    func preservesGenuineApology() async {
+        let formatter = RuleBasedFormatter(removeFillerWords: true)
+        let result = await formatter.format("i'm sorry i missed your call")
+        #expect(result == "I'm sorry i missed your call.")
+    }
 }

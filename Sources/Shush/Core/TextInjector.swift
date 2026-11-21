@@ -47,11 +47,11 @@ enum TextInjector {
             systemWide,
             kAXFocusedUIElementAttribute as CFString,
             &focused
-        ) == .success, let focused else {
+        ) == .success, let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else {
             return .unverified("no focused element")
         }
 
-        let element = unsafeDowncast(focused as AnyObject, to: AXUIElement.self)
+        let element = focused as! AXUIElement
 
         var settable: DarwinBoolean = false
         guard AXUIElementIsAttributeSettable(
@@ -99,9 +99,9 @@ enum TextInjector {
             element,
             kAXSelectedTextRangeAttribute as CFString,
             &value
-        ) == .success, let value else { return nil }
+        ) == .success, let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
 
-        let axValue = unsafeDowncast(value as AnyObject, to: AXValue.self)
+        let axValue = value as! AXValue
         guard AXValueGetType(axValue) == .cfRange else { return nil }
 
         var range = CFRange()

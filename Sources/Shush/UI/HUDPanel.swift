@@ -69,14 +69,15 @@ final class HUDPanel: NSPanel {
 
         var windowRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
-              let windowRef else { return nil }
-        let window = unsafeDowncast(windowRef as AnyObject, to: AXUIElement.self)
+              let windowRef, CFGetTypeID(windowRef) == AXUIElementGetTypeID() else { return nil }
+        let window = windowRef as! AXUIElement
 
         var positionRef: CFTypeRef?
         var sizeRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionRef) == .success,
               AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeRef) == .success,
-              let positionRef, let sizeRef else { return nil }
+              let positionRef, CFGetTypeID(positionRef) == AXValueGetTypeID(),
+              let sizeRef, CFGetTypeID(sizeRef) == AXValueGetTypeID() else { return nil }
 
         var position = CGPoint.zero
         var size = CGSize.zero
@@ -114,8 +115,9 @@ final class HUDPanel: NSPanel {
             context.duration = 0.16
             animator().alphaValue = 0
         } completionHandler: { [weak self] in
-            // AppKit always calls this on the main thread.
-            MainActor.assumeIsolated { self?.orderOut(nil) }
+            Task { @MainActor in
+                self?.orderOut(nil)
+            }
         }
     }
 }

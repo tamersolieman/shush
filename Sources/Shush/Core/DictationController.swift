@@ -220,7 +220,7 @@ final class DictationController {
                     outputFormat: format,
                     microphoneDeviceID: microphoneDeviceID,
                     vadEnabled: Settings.shared.vadEnabled,
-                    vadTailSeconds: Settings.shared.engine.showsLiveText ? 0.8 : 0.35,
+                    vadTailSeconds: Settings.shared.engine.showsLiveText ? 1.5 : 0.6,
                     onBuffer: { chunk in
                         audioContinuation.yield(chunk)
                     },
@@ -341,6 +341,7 @@ final class DictationController {
             // about to receive the text — the one the dashboard should credit.
             let target = NSWorkspace.shared.frontmostApplication
             recordRun(text: output, corrections: corrections, appName: target?.localizedName, appBundleID: target?.bundleIdentifier)
+            self.transcript = output
             TextInjector.insert(output)
             if snippet == nil && Settings.shared.learnFromCorrectionsEnabled && Permissions.hasAccessibility {
                 CorrectionWatcher.shared.observe(injected: output, target: target)

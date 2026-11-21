@@ -277,7 +277,7 @@ final class Settings {
         // Apple by default: no download, no dependency, live text while speaking.
         engine = SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "") ?? .apple
         cleanupEnabled = defaults.object(forKey: Keys.cleanupEnabled) as? Bool ?? true
-        smartCleanup = defaults.object(forKey: Keys.smartCleanup) as? Bool ?? false
+        smartCleanup = defaults.object(forKey: Keys.smartCleanup) as? Bool ?? true
         soundEnabled = defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true
         vadEnabled = defaults.object(forKey: Keys.vadEnabled) as? Bool ?? true
         removeFillerWords = defaults.object(forKey: Keys.removeFillerWords) as? Bool ?? true

@@ -638,6 +638,15 @@ private struct CleanupSection: View {
         }
         .padding(.horizontal, DS.Space.base)
         .padding(.vertical, DS.Space.base)
+
+        CardDivider()
+
+        ToggleRow(title: "Smart Cleanup (On-Device AI)", isOn: $settings.smartCleanup)
+            .disabled(!FoundationModelFormatter.isAvailable)
+        RowSubtitle(
+            FoundationModelFormatter.unavailableReason
+                ?? "Uses Apple Intelligence on-device to remove pause commas, apply \"sorry\" self-corrections, and rephrase broken speech."
+        )
     }
 }
 
